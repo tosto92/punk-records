@@ -1,0 +1,16 @@
+# Local dogfooding state: never publish memories, agent configs or tool caches
+# written on a developer machine (they carry absolute paths and session data).
+/memory/
+/graft/
+/.worktrees/
+/.nova-tracer/
+/.superpowers/
+/.claude/
+/.codex/
+/.agents/
+/.mcp.json
+/opencode.json
+/AGENTS.md
+/CLAUDE.md
+.previously
+__pycache__/

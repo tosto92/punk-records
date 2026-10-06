@@ -1,0 +1,100 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawn, execFileSync} from 'node:child_process';
+import {search} from '../lib/ask.js';
+import {loadMemories} from '../lib/build.js';
+
+async function setup(t) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-save-'));
+  const previous = process.env.PREVIOUSLY_HOME;
+  process.env.PREVIOUSLY_HOME = dir;
+  t.after(() => { if (previous === undefined) delete process.env.PREVIOUSLY_HOME; else process.env.PREVIOUSLY_HOME = previous; fs.rmSync(dir, {recursive: true, force: true}); });
+  const api = await import('../lib/save.js').catch(() => ({}));
+  return {dir, save: api.saveMemory, options: {cwd: dir, scope: 'global'}, resolved: {repoRoot: null}};
+}
+function snapshot(dir) {
+  return Object.fromEntries(fs.readdirSync(dir, {recursive: true, withFileTypes: true})
+    .filter(e => e.isFile()).map(e => {const file = path.join(e.parentPath, e.name); return [path.relative(dir, file), fs.readFileSync(file, 'utf8')];}));
+}
+
+test('save/find reads live events without an index or writes, even with corrupt index', async t => {
+  const {dir, save, options, resolved} = await setup(t);
+  const result = save({type: 'solved', title: 'unique zebra', solution: 'restart'}, options);
+  assert.equal(result.outcome, 'ok');
+  assert.match(result.memoryId, /^[a-f0-9]{40}$/);
+  const before = snapshot(dir);
+  assert.equal(search({query: 'unique zebra', resolved})[0].memoryId, result.memoryId);
+  assert.deepEqual(snapshot(dir), before);
+  fs.writeFileSync(path.join(dir, 'index.json'), '{broken');
+  assert.equal(search({query: 'unique zebra', resolved})[0].memoryId, result.memoryId);
+  assert.equal(fs.readFileSync(path.join(dir, 'index.json'), 'utf8'), '{broken');
+});
+
+test('outcome defaults, precedence and ref inheritance preserve the identity', async t => {
+  const {dir, save, options} = await setup(t);
+  assert.equal(save({type: 'solved', title: 'incomplete'}, options).outcome, 'open');
+  const original = save({type: 'note', title: 'ongoing fix', symptoms: 'failure', outcome: 'partial'}, options);
+  assert.equal(save({ref: original.slug, solution: 'detail'}, options).outcome, 'partial');
+  const promoted = save({ref: original.memoryId, type: 'solved', solution: 'fixed'}, options);
+  assert.equal(promoted.outcome, 'ok');
+  assert.equal(promoted.slug, original.slug);
+  assert.equal(promoted.memoryId, original.memoryId);
+  assert.equal(save({ref: original.memoryId, type: 'solved', outcome: 'open', title: 'renamed'}, options).outcome, 'open');
+  const memory = loadMemories(dir).memories.find(m => m.memoryId === original.memoryId);
+  assert.equal(memory.title, 'renamed');
+  assert.equal(memory.symptoms, 'failure');
+  assert.equal(memory.slug, original.slug);
+  const raw = fs.readFileSync(path.join(dir, 'events.jsonl'), 'utf8');
+  for (const input of [{ref: 'missing'}, {ref: '../escape'}, {type: 'note', title: 'bad', outcome: 'failed'}, {type: 'note', title: 'bad', tags: [3]}]) {
+    assert.throws(() => save(input, options), TypeError);
+    assert.equal(fs.readFileSync(path.join(dir, 'events.jsonl'), 'utf8'), raw);
+  }
+});
+
+test('reference resolution never implicitly crosses scopes', async t => {
+  const {dir, save, options} = await setup(t);
+  const global = save({type: 'note', title: 'global only'}, options);
+  const repo = path.join(dir, 'repo'); fs.mkdirSync(repo); execFileSync('git', ['init', '-q'], {cwd: repo});
+  assert.throws(() => save({ref: global.memoryId, solution: 'wrong scope'}, {cwd: repo, scope: 'repo'}), /unknown/);
+  assert.equal(fs.existsSync(path.join(repo, 'memory/events.jsonl')), false);
+});
+
+test('legacy outcomes stay persisted and partial tail is reread', async t => {
+  const {dir, save, options, resolved} = await setup(t);
+  const legacy = {v: 1, ts: '2026-10-02T00:00:00Z', type: 'solved', title: 'legacy token', solution: 'fix', outcome: 'open'};
+  const file = path.join(dir, 'events.jsonl');
+  fs.writeFileSync(file, JSON.stringify(legacy) + '\n');
+  assert.equal(search({query: 'legacy token', resolved})[0].outcome, 'open');
+  save({type: 'note', title: 'complete token'}, options);
+  const before = fs.readFileSync(file, 'utf8');
+  const pending = JSON.stringify({...legacy, title: 'pending token'});
+  fs.appendFileSync(file, pending.slice(0, -1));
+  assert.equal(search({query: 'pending', resolved}).length, 0);
+  fs.appendFileSync(file, '}\n');
+  assert.equal(search({query: 'pending', resolved})[0].title, 'pending token');
+  assert.equal(before.split('\n')[0], JSON.stringify(legacy));
+});
+
+test('concurrent CLI writers keep every complete event searchable', async t => {
+  const {dir, resolved} = await setup(t);
+  const cli = path.resolve(import.meta.dirname, '../bin/previously');
+  await Promise.all(Array.from({length: 8}, (_, i) => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [cli, 'save', '--global', '--type', 'note', '--title', `writer token ${i}`],
+      {env: {...process.env, PREVIOUSLY_HOME: dir}, stdio: 'ignore'});
+    child.on('error', reject); child.on('exit', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
+  })));
+  assert.equal(fs.readFileSync(path.join(dir, 'events.jsonl'), 'utf8').trim().split('\n').length, 8);
+  assert.equal(search({query: 'writer token', limit: 20, resolved}).length, 8);
+  assert.deepEqual(fs.readdirSync(dir), ['events.jsonl']);
+});
+
+test('save rejects event-register symlink without touching its target', async t => {
+  const {dir, save, options} = await setup(t);
+  const outside = path.join(dir, 'outside'); fs.writeFileSync(outside, 'original');
+  fs.symlinkSync(outside, path.join(dir, 'events.jsonl'));
+  assert.throws(() => save({type: 'note', title: 'unsafe register'}, options), /symlink/);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'original');
+});

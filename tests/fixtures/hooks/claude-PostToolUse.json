@@ -1,0 +1,27 @@
+{
+  "_source": "live capture, Codex CLI 0.160.0 / Claude Code 2.1.289, 2026-10-05",
+  "session_id": "07230ce2-18eb-4b7c-8345-773c5c646f43",
+  "transcript_path": "/PROBE/claude-config/projects/-REPO/07230ce2-18eb-4b7c-8345-773c5c646f43.jsonl",
+  "cwd": "/REPO",
+  "prompt_id": "0156cab1-9963-49ff-ae8c-c37cfc00c864",
+  "permission_mode": "acceptEdits",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "/REPO/hello.txt",
+    "content": "hi"
+  },
+  "tool_response": {
+    "type": "create",
+    "filePath": "/REPO/hello.txt",
+    "content": "hi",
+    "structuredPatch": [],
+    "originalFile": null,
+    "userModified": false
+  },
+  "tool_use_id": "toolu_01AKJq93RuHaWWbgFt43JyzV",
+  "duration_ms": 20
+}

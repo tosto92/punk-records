@@ -1,0 +1,11 @@
+{
+  "_source": "live capture, Codex CLI 0.160.0 / Claude Code 2.1.289, 2026-10-05",
+  "session_id": "01a10adb-b459-7651-bce5-3e4fc4d9fc79",
+  "turn_id": "01a10adb-b4e7-7d13-85aa-ef852e07d12b",
+  "transcript_path": "/PROBE/codex-home/sessions/2026/10/05/rollout-2026-10-05T08-58-53-01a10adb-b459-7651-bce5-3e4fc4d9fc79.jsonl",
+  "cwd": "/REPO",
+  "hook_event_name": "UserPromptSubmit",
+  "model": "gpt-6.1-sol",
+  "permission_mode": "bypassPermissions",
+  "prompt": "If your context mentions a deploy codeword, reply with it. Then create a file named hello.txt containing hi using your file editing tool. Do nothing else."
+}

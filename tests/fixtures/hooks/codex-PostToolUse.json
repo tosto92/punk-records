@@ -1,0 +1,16 @@
+{
+  "_source": "live capture, Codex CLI 0.160.0 / Claude Code 2.1.289, 2026-10-05",
+  "session_id": "01a10adb-b459-7651-bce5-3e4fc4d9fc79",
+  "turn_id": "01a10adb-b4e7-7d13-85aa-ef852e07d12b",
+  "transcript_path": "/PROBE/codex-home/sessions/2026/10/05/rollout-2026-10-05T08-58-53-01a10adb-b459-7651-bce5-3e4fc4d9fc79.jsonl",
+  "cwd": "/REPO",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-6.1-sol",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "apply_patch",
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Add File: hello.txt\n+hi\n*** End Patch"
+  },
+  "tool_response": "Exit code: 0\nWall time: 0.1 seconds\nOutput:\nSuccess. Updated the following files:\nA hello.txt\n",
+  "tool_use_id": "exec-70e6b158-92b1-40dd-b1f9-b569da56abc7"
+}

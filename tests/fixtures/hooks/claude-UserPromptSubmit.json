@@ -1,0 +1,10 @@
+{
+  "_source": "live capture, Codex CLI 0.160.0 / Claude Code 2.1.289, 2026-10-05",
+  "session_id": "07230ce2-18eb-4b7c-8345-773c5c646f43",
+  "transcript_path": "/PROBE/claude-config/projects/-REPO/07230ce2-18eb-4b7c-8345-773c5c646f43.jsonl",
+  "cwd": "/REPO",
+  "prompt_id": "0156cab1-9963-49ff-ae8c-c37cfc00c864",
+  "permission_mode": "acceptEdits",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "If your context mentions a deploy codeword, reply with it. Then create a file named hello.txt containing hi using your file editing tool. Do nothing else."
+}
