@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" role="img" aria-labelledby="t d">
+  <title id="t">Previously on localhost…</title>
+  <desc id="d">Session memory for Claude Code, Codex and OpenCode</desc>
+  <rect width="1280" height="360" fill="#000"/>
+  <rect y="36" width="1280" height="288" fill="#15181B"/>
+  <text x="96" y="196" fill="#E7E9EA" font-family="'Iowan Old Style','Palatino Linotype','Book Antiqua',Palatino,Georgia,serif" font-style="italic" font-size="84" letter-spacing="-1">Previously on localhost<tspan fill="#F2C94C">…</tspan></text>
+  <text x="98" y="252" fill="#8B9298" font-family="'Avenir Next','Segoe UI',system-ui,-apple-system,sans-serif" font-size="26">Session memory for Claude Code, Codex and OpenCode</text>
+</svg>

@@ -3,112 +3,155 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Previously on localhost — episodes</title>
+<title>Episodes — Previously on localhost</title>
 <style>
+  /* Tokens shared with the memory viewer (lib/viewer/style.css); --cue is the recap-caption yellow. */
   :root {
-    --bg: #f7f7f5; --panel: #fff; --fg: #1d1d1b; --muted: #75746f; --line: #e4e3de;
-    --accent: #2f6fd6; --claude: #c96442; --codex: #10a37f; --hover: #f0efeb;
+    --bg: #F4F6F6; --panel: #FFFFFF; --panel2: #FBFCFC; --ink: #17191B; --muted: #6B7278;
+    --border: #E2E6E7; --chip: #F0F3F3; --accent: #546FFF; --cue: #C99A06;
+    --claude: #C15F3C; --codex: #0E8A6A;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #161615; --panel: #1f1f1d; --fg: #ecebe6; --muted: #9a9993; --line: #33322f;
-            --accent: #7aa7f0; --claude: #e08a6a; --codex: #3ccf9f; --hover: #2a2927; }
+    :root { --bg: #0E1012; --panel: #15181B; --panel2: #111417; --ink: #E7E9EA; --muted: #8B9298;
+            --border: #252B30; --chip: #1C2125; --accent: #7B8FFF; --cue: #F2C94C;
+            --claude: #E0896A; --codex: #3CCF9F; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 14px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
-  header { position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center;
-           padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 16px; margin: 0 8px 0 0; }
-  input, select, button { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
-                          border-radius: 6px; padding: 5px 8px; }
-  input { flex: 1; max-width: 420px; }
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; flex-direction: column; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 16px;
+           background: var(--panel); border-bottom: 1px solid var(--border); flex: none; }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .wordmark { font: italic 400 21px/1 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+              letter-spacing: -.01em; white-space: nowrap; }
+  .wordmark .cue, .tbc .cue { color: var(--cue); }
+  .brand .page { color: var(--muted); font-size: 13px; }
+  input, select, button { font: inherit; font-size: 13px; color: var(--ink); background: var(--panel2);
+                          border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+  input { width: min(340px, 100%); }
+  input:focus { border-color: var(--accent); outline: none; }
   button { cursor: pointer; }
-  main { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 53px); }
-  aside { border-right: 1px solid var(--line); overflow-y: auto; max-height: calc(100vh - 53px); position: sticky; top: 53px; }
-  .proj { padding: 8px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
-  .proj:hover, .proj.on { background: var(--hover); }
-  .proj b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .muted { color: var(--muted); font-size: 12px; }
-  #tl { padding: 8px 20px 40px; }
-  .day { margin: 18px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  .pgroup { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
-  .pgroup > .ph { padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 600; }
-  .sess { display: grid; grid-template-columns: 96px 58px 1fr; gap: 8px; padding: 6px 12px; cursor: pointer; }
-  .sess:hover { background: var(--hover); }
+  button:hover { border-color: var(--muted); }
+
+  main { flex: 1; min-height: 0; display: grid; grid-template-columns: 280px 1fr; }
+  aside { overflow-y: auto; border-right: 1px solid var(--border); background: var(--panel2); }
+  aside h2 { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 16px 6px; }
+  .proj { display: block; width: 100%; text-align: left; border: 0; border-left: 3px solid transparent; border-radius: 0;
+          background: none; padding: 9px 16px 9px 13px; }
+  .proj:hover { background: var(--chip); }
+  .proj.on { background: var(--chip); border-left-color: var(--cue); }
+  .proj b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .muted { color: var(--muted); font-size: 12.5px; }
+  .proj .muted { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  #tl { overflow-y: auto; padding: 4px 24px 48px; }
+  .day { font: italic 400 19px/1.3 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; margin: 22px 0 8px; }
+  .pgroup { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+  .ph { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  .sess { display: grid; grid-template-columns: 92px 72px 1fr auto; gap: 12px; align-items: baseline; width: 100%;
+          text-align: left; border: 0; border-radius: 0; background: none; padding: 8px 14px; }
+  .sess + .sess { border-top: 1px solid var(--border); }
+  .sess:hover { background: var(--chip); }
+  .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; }
   .tool { font-size: 12px; font-weight: 600; }
+  .tool::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px;
+                  background: currentColor; vertical-align: 1px; }
   .tool.claude { color: var(--claude); } .tool.codex { color: var(--codex); }
-  .branch { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--hover); color: var(--muted); margin-left: 6px; }
-  dialog { width: min(900px, 94vw); max-height: 86vh; border: 1px solid var(--line); border-radius: 10px;
-           background: var(--panel); color: var(--fg); padding: 0; }
-  dialog::backdrop { background: #0006; }
-  .dh { position: sticky; top: 0; background: var(--panel); padding: 14px 18px; border-bottom: 1px solid var(--line); }
-  .cmd { display: flex; gap: 8px; margin-top: 8px; }
-  .cmd code { flex: 1; overflow-x: auto; white-space: nowrap; padding: 5px 8px; background: var(--bg); border-radius: 6px; font-size: 12px; }
-  .prompt { padding: 10px 18px; border-bottom: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
-  .prompt .muted { display: block; }
-  @media (max-width: 720px) { main { grid-template-columns: 1fr; } aside { position: static; max-height: 240px; border-right: 0; border-bottom: 1px solid var(--line); } }
+  .title { min-width: 0; }
+  .branch { font-size: 11.5px; padding: 1px 8px; border-radius: 10px; background: var(--chip); color: var(--muted); margin-left: 8px; white-space: nowrap; }
+  .empty { margin: 48px auto; max-width: 420px; text-align: center; color: var(--muted); }
+
+  dialog { width: min(860px, 94vw); max-height: 86vh; padding: 0; border: 1px solid var(--border); border-radius: 12px;
+           background: var(--panel); color: var(--ink); }
+  dialog::backdrop { background: rgb(14 16 18 / .55); }
+  .dh { position: sticky; top: 0; background: var(--panel); padding: 16px 20px 14px; border-bottom: 1px solid var(--border); }
+  .dh h3 { margin: 0 0 2px; font-size: 16px; }
+  .tbc { margin: 14px 0 6px; font: italic 400 15px/1 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; }
+  .cmd { display: flex; gap: 8px; }
+  .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 6px 10px; border-radius: 8px;
+              background: var(--panel2); border: 1px solid var(--border); font: 12.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .prompt { padding: 10px 20px; border-bottom: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+  .prompt .time { display: block; }
+
+  @media (max-width: 760px) {
+    main { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    aside { max-height: 200px; border-right: 0; border-bottom: 1px solid var(--border); }
+    #tl { padding: 4px 12px 40px; }
+    .sess { grid-template-columns: auto 1fr; }
+    .sess .title { grid-column: 1 / -1; }
+    .sess .count { display: none; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Episodes</h1>
-  <input id="q" type="search" placeholder="Filter: project, title, branch, prompt…">
-  <select id="days">
-    <option value="1">today</option><option value="3">3 days</option>
-    <option value="7" selected>7 days</option><option value="30">30 days</option><option value="365">1 year</option>
+  <div class="brand"><span class="wordmark">Previously on localhost<span class="cue">…</span></span><span class="page">Episodes</span></div>
+  <input id="q" type="search" placeholder="Filter by project, title, branch or prompt" aria-label="Filter episodes">
+  <select id="days" aria-label="Period">
+    <option value="1">Today</option><option value="3">Last 3 days</option>
+    <option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="365">Last year</option>
   </select>
 </header>
 <main>
-  <aside id="projects"></aside>
-  <section id="tl"></section>
+  <aside><h2>Series</h2><div id="projects"></div></aside>
+  <section id="tl" aria-live="polite"></section>
 </main>
 <dialog id="dlg"></dialog>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const home = s => (s || "?").replace(/^\/home\/[^/]+/, "~");
+const home = s => (s || "?").replace(/^\/(home|Users)\/[^/]+/, "~");
 const t = (ts, o) => new Date(ts * 1000).toLocaleString(undefined, o);
-const hm = ts => t(ts, {hour: "2-digit", minute: "2-digit"});
+const hm = ts => t(ts, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
+const when = ts => t(ts, {month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const cut = (s, n = 110) => { s = String(s || "").replace(/\s+/g, " "); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
-const copyBtn = cmd => `<button onclick="navigator.clipboard.writeText(${esc(JSON.stringify(cmd))}); this.textContent='copied'">copy</button>`;
 
 async function load() {
   const q = $("#q").value, days = $("#days").value;
-  localStorage.setItem("previously-episodes", JSON.stringify({q, days}));
+  try { localStorage.setItem("previously-episodes", JSON.stringify({q, days})); } catch {}
   const d = await (await fetch(`/api/data?q=${encodeURIComponent(q)}&days=${days}`)).json();
 
   $("#projects").innerHTML = d.projects.map(p => `
-    <div class="proj ${q === p.project ? "on" : ""}" data-p="${esc(p.project)}">
-      <b title="${esc(p.project)}">${esc(home(p.project))}</b>
-      <div class="muted">${t(p.last_ts, {dateStyle: "short", timeStyle: "short"})} · ${p.ns} episodes · ${p.days} days</div>
-      <div class="muted">${esc(cut(p.last.title || p.last.first, 60))}</div>
-    </div>`).join("");
+    <button class="proj ${q === p.project ? "on" : ""}" data-p="${esc(p.project)}" title="${esc(p.project)}">
+      <b>${esc(home(p.project))}</b>
+      <span class="muted">${esc(cut(p.last.title || p.last.first, 60))}</span>
+      <span class="muted">${when(p.last_ts)}, ${plural(p.ns, "episode")}</span>
+    </button>`).join("");
 
-  const days_ = {};
-  for (const r of d.timeline) ((days_[r.day] ??= {})[r.project] ??= []).push(r);
-  $("#tl").innerHTML = Object.entries(days_).map(([day, projs]) => `
-    <div class="day">${t(new Date(day).getTime() / 1000 + 43200, {weekday: "long", day: "numeric", month: "long"})}</div>
+  const byDay = {};
+  for (const r of d.timeline) ((byDay[r.day] ??= {})[r.project] ??= []).push(r);
+  $("#tl").innerHTML = Object.entries(byDay).map(([day, projs]) => `
+    <h2 class="day">${t(new Date(day).getTime() / 1000 + 43200, {weekday: "long", day: "numeric", month: "long"})}</h2>
     ${Object.entries(projs).map(([p, ss]) => `
       <div class="pgroup">
-        <div class="ph">${esc(home(p))} <span class="muted">· ${ss.length} episodes, ${ss.reduce((a, s) => a + s.dn, 0)} prompt</span></div>
+        <div class="ph">${esc(home(p))} <span class="muted">${plural(ss.length, "episode")}, ${plural(ss.reduce((a, s) => a + s.dn, 0), "prompt")}</span></div>
         ${ss.map(s => `
-          <div class="sess" data-id="${esc(s.id)}">
-            <span class="muted">${hm(s.t0)}–${hm(s.t1)}</span>
+          <button class="sess" data-id="${esc(s.id)}">
+            <span class="time">${hm(s.t0)}–${hm(s.t1)}</span>
             <span class="tool ${esc(s.tool)}">${esc(s.tool)}</span>
-            <span>${esc(cut(s.title || s.first))}${s.branch ? `<span class="branch">${esc(s.branch)}</span>` : ""}
-              <span class="muted"> · ${s.dn} prompt</span></span>
-          </div>`).join("")}
-      </div>`).join("")}`).join("") || `<p class="muted">No activity in this period.</p>`;
+            <span class="title">${esc(cut(s.title || s.first))}${s.branch ? `<span class="branch">${esc(s.branch)}</span>` : ""}</span>
+            <span class="muted count">${plural(s.dn, "prompt")}</span>
+          </button>`).join("")}
+      </div>`).join("")}`).join("")
+    || `<p class="empty">No episodes in this period. Pick a longer period or clear the filter.</p>`;
 }
 
 async function openSession(id) {
   const {session: s, prompts} = await (await fetch(`/api/session?id=${encodeURIComponent(id)}`)).json();
   $("#dlg").innerHTML = `
     <div class="dh">
-      <b>${esc(s.title || cut(s.first, 80))}</b>
-      <div class="muted">${esc(s.tool)} · ${esc(home(s.cwd))}${s.branch ? " · " + esc(s.branch) : ""} · ${s.n} prompts</div>
-      <div class="cmd"><code>${esc(s.resume)}</code>${copyBtn(s.resume)}<button onclick="dlg.close()">chiudi</button></div>
+      <h3>${esc(s.title || cut(s.first, 80))}</h3>
+      <div class="muted">${esc(s.tool)} in ${esc(home(s.cwd))}${s.branch ? ` on ${esc(s.branch)}` : ""}, ${plural(s.n, "prompt")}</div>
+      <div class="tbc">To be continued<span class="cue">…</span></div>
+      <div class="cmd"><code>${esc(s.resume)}</code><button id="copy">Copy</button><button id="close">Close</button></div>
     </div>
-    ${prompts.map(p => `<div class="prompt"><span class="muted">${t(p.ts, {dateStyle: "short", timeStyle: "short"})}</span>${esc(p.text)}</div>`).join("")}`;
+    ${prompts.map(p => `<div class="prompt"><span class="time">${when(p.ts)}</span>${esc(p.text)}</div>`).join("")}`;
+  $("#copy").onclick = async e => { await navigator.clipboard.writeText(s.resume); e.target.textContent = "Copied"; };
+  $("#close").onclick = () => $("#dlg").close();
   $("#dlg").showModal();
   $("#dlg .prompt:last-child")?.scrollIntoView();
 }

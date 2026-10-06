@@ -135,7 +135,7 @@ test('interactive viewer is self-contained: serves its bundle and the memories a
   const server = await serveGraph(resolveScopes({explicit: 'local'}, repo), {scope: 'local', port: 46_000 + (process.pid % 500), viewer: 'auto'});
   try {
     assert.equal(server.viewer, 'interactive');
-    assert.match(await (await fetch(server.url + '/')).text(), /<b>previously on localhost<\/b>/);
+    assert.match(await (await fetch(server.url + '/')).text(), /class="wordmark">Previously on localhost/);
     assert.match(fs.readFileSync(path.resolve('lib/viewer/LICENSE'), 'utf8'), /MIT License/);
     const page = await (await fetch(server.url + '/app.js')).text();
     assert.match(page, /context-graph/);

@@ -1,6 +1,11 @@
-# Previously on localhost
+<p align="center"><img src="docs/images/banner.svg" alt="Previously on localhost…" width="100%"></p>
 
-> Previously, on your repo…
+<p align="center">
+  <a href="https://github.com/tosto92/previously-on-localhost/actions/workflows/test.yml"><img alt="tests" src="https://github.com/tosto92/previously-on-localhost/actions/workflows/test.yml/badge.svg"></a>
+  <img alt="Node 20.11+" src="https://img.shields.io/badge/node-%E2%89%A520.11-3C873A">
+  <img alt="zero dependencies" src="https://img.shields.io/badge/dependencies-0-546FFF">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-6B7278"></a>
+</p>
 
 Session memory for coding agents. Before each turn the agent gets a **recap**
 of what past sessions learned in this project, the way a TV show opens with
@@ -9,6 +14,15 @@ of what past sessions learned in this project, the way a TV show opens with
 - Node only, zero dependencies, no LLM calls, no API key.
 - Everything stays on your machine: no network access, no telemetry.
 - Plain files: an append-only `events.jsonl` you can read, grep and commit.
+
+```mermaid
+flowchart LR
+  P([Your prompt]) --> R[Recap<br/>matching memories injected]
+  R --> T[The agent works]
+  T --> C[Cliffhanger<br/>draft with the files it edited]
+  C -. you or the agent keep what generalizes .-> S[(Spoilers<br/>saved memories)]
+  S --> R
+```
 
 | Show term | What it is |
 |---|---|
@@ -75,13 +89,18 @@ For example, use the plugins for Claude Code and Codex, then
 previously init                   # in a repo: project memory + agent config for this repo only
 previously ask "<symptoms, errors or file names>"
 previously save --type solved --title "…" --symptoms "…" --solution "…" --files src/a.ts
-previously graph --open           # browse memories in a local web viewer
+previously graph --serve --open   # browse memories in a local web viewer
 previously --help
 ```
 
 Agents mostly do this themselves: the skill tells them to recall before
 exploring and to save what generalizes. Memory types: `solved`,
 `attempt_failed`, `decision`, `note`.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/memories-dark.png">
+  <img alt="The memory viewer: memories as a graph linked by shared tags and files, with the selected spoiler on the right" src="docs/images/memories-light.png">
+</picture>
 
 ## Episodes
 
@@ -97,6 +116,11 @@ A read-only SQLite index of `~/.claude` and `~/.codex` (or `CLAUDE_CONFIG_DIR` /
 `CODEX_HOME`), synced on every call into `~/.local/share/previously/episodes.db`.
 Needs Python 3.9+. The `previously-episodes` skill lets the agent answer
 "where was I?" itself.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/episodes-dark.png">
+  <img alt="The episodes page: past sessions grouped by day and project, with the agent, branch and prompt count" src="docs/images/episodes-light.png">
+</picture>
 
 ## Where memories live
 
@@ -138,7 +162,8 @@ Claude Code, Codex and OpenCode releases.
 ## Development
 
 ```sh
-npm test       # node --test; live agent smoke tests run only with CLAUDE_BIN / CODEX_BIN set
+npm test                      # node --test; live agent smoke tests run only with CLAUDE_BIN / CODEX_BIN set
+node scripts/screenshots.mjs  # regenerate docs/images from made-up demo data (needs playwright)
 ```
 
 ## License

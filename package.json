@@ -15,7 +15,7 @@
     ".claude-plugin/",
     ".codex-plugin/",
     "commands/",
-    "docs/",
+    "docs/*.md",
     "LICENSE",
     "CHANGELOG.md",
     "README.md"

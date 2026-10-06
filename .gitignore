@@ -14,3 +14,4 @@
 /CLAUDE.md
 .previously
 __pycache__/
+node_modules/

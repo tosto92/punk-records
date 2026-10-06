@@ -1,11 +1,11 @@
-/* previously on localhost viewer: design tokens + app styles. Third-party viewer (MIT): see LICENSE in this folder. Local edits: memory type colours --ok/--bad. */
+/* previously on localhost viewer: design tokens + app styles. Third-party viewer (MIT): see LICENSE in this folder. Local edits: memory type colours --ok/--bad, --cue and the .wordmark title card; app.js: memory wording ("Related", "spoiler"). */
 :root{
   --bg:#F4F6F6; --panel:#FFFFFF; --panel2:#FBFCFC; --ink:#17191B; --muted:#6B7278;
   --border:#E2E6E7; --border2:#EDF0F1; --accent:#546FFF; --accent-ink:#546FFF;
   --chip:#F0F3F3;
   --sys:#4A7DF0; --con:#A06BDB; --fil:#D98E2B; --api:#C95CB8; --ok:#2F9E44; --bad:#D9480F;
   --k-file:#D98E2B; --k-class:#4A7DF0; --k-fn:#4F86C6; --k-method:#3AA7C9; --k-iface:#A06BDB; --k-type:#C95CB8; --k-enum:#B69B3D;
-  --edge:#9AA4A9; --canvas:#F8FAFA;
+  --edge:#9AA4A9; --canvas:#F8FAFA; --cue:#C99A06;
 }
 @media (prefers-color-scheme: dark){
   :root{
@@ -14,7 +14,7 @@
     --chip:#1C2125;
     --sys:#6B94F5; --con:#B487E0; --fil:#E0A04A; --api:#D183C9; --ok:#51CF66; --bad:#FF8787;
     --k-file:#E0A04A; --k-class:#6B94F5; --k-fn:#7EAEDD; --k-method:#56B9D8; --k-iface:#B487E0; --k-type:#D183C9; --k-enum:#D4BB5E;
-    --edge:#4A545B; --canvas:#101315;
+    --edge:#4A545B; --canvas:#101315; --cue:#F2C94C;
   }
 }
 :root[data-theme="dark"]{
@@ -23,7 +23,7 @@
   --chip:#1C2125;
   --sys:#6B94F5; --con:#B487E0; --fil:#E0A04A; --api:#D183C9; --ok:#51CF66; --bad:#FF8787;
   --k-file:#E0A04A; --k-class:#6B94F5; --k-fn:#7EAEDD; --k-method:#56B9D8; --k-iface:#B487E0; --k-type:#D183C9; --k-enum:#D4BB5E;
-  --edge:#4A545B; --canvas:#101315;
+  --edge:#4A545B; --canvas:#101315; --cue:#F2C94C;
 }
 :root[data-theme="light"]{
   --bg:#F4F6F6; --panel:#FFFFFF; --panel2:#FBFCFC; --ink:#17191B; --muted:#6B7278;
@@ -31,7 +31,7 @@
   --chip:#F0F3F3;
   --sys:#4A7DF0; --con:#A06BDB; --fil:#D98E2B; --api:#C95CB8; --ok:#2F9E44; --bad:#D9480F;
   --k-file:#D98E2B; --k-class:#4A7DF0; --k-fn:#4F86C6; --k-method:#3AA7C9; --k-iface:#A06BDB; --k-type:#C95CB8; --k-enum:#B69B3D;
-  --edge:#9AA4A9; --canvas:#F8FAFA;
+  --edge:#9AA4A9; --canvas:#F8FAFA; --cue:#C99A06;
 }
 
 *{box-sizing:border-box}
@@ -49,6 +49,8 @@ button:focus-visible,input:focus-visible,.tree-row:focus-visible{outline:2px sol
 .appbar{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex:none}
 .brand{display:flex;align-items:baseline;gap:8px;flex:none}
 .brand b{font-weight:700;letter-spacing:-.01em}
+.brand .wordmark{color:var(--ink);font:italic 400 21px/1 "Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;letter-spacing:-.01em;white-space:nowrap}
+.brand .wordmark .cue{color:var(--cue);font:inherit}
 .brand span{color:var(--muted);font-size:13px}
 .counts{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;flex:none}
 .tabs{display:flex;background:var(--chip);border-radius:9px;padding:3px;gap:2px;margin-left:auto;flex:none}
