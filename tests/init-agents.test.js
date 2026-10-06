@@ -10,8 +10,8 @@ import { MATCHERS } from "../lib/hook-tools.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BIN = path.join(ROOT, "bin", "previously");
-const SKILL = path.join(ROOT, ".opencode", "skills", "previously");
-const COMMAND = path.join(ROOT, ".opencode", "commands", "previously-save.md");
+const SKILL = path.join(ROOT, "skills", "previously");
+const COMMAND = path.join(ROOT, "commands", "previously-save.md");
 const EVENTS = ["UserPromptSubmit", "PostToolUse", "Stop"];
 
 // Throwaway HOME, stores and repo per test; agent dirs resolve inside HOME.
@@ -47,7 +47,7 @@ test("repo init wires Claude Code: MCP, hooks, CLAUDE.md, skill, command", (t) =
   assert.equal(settings.hooks.PostToolUse[0].matcher, "Write|Edit|MultiEdit|NotebookEdit");
   assert.match(fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8"), /<!-- previously:start -->/);
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "previously")), SKILL);
-  assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "previously-episodes")), path.join(ROOT, ".opencode", "skills", "previously-episodes"));
+  assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "previously-episodes")), path.join(ROOT, "skills", "previously-episodes"));
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "commands", "previously-save.md")), COMMAND);
   assert.equal(fs.existsSync(path.join(repo, "opencode.json")), false, "opencode not requested");
   assert.equal(fs.existsSync(path.join(repo, "AGENTS.md")), false, "AGENTS.md is for opencode/codex");

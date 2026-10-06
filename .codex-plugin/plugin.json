@@ -1,0 +1,26 @@
+{
+  "name": "previously",
+  "version": "0.1.0",
+  "description": "Session memory for coding agents: a recap of past sessions before every turn, cliffhanger drafts at turn end, and your past episodes.",
+  "author": { "name": "Tommaso Tosi", "url": "https://github.com/tosto92" },
+  "homepage": "https://github.com/tosto92/previously-on-localhost",
+  "repository": "https://github.com/tosto92/previously-on-localhost",
+  "license": "MIT",
+  "keywords": ["memory", "sessions", "recall"],
+  "skills": "./skills/",
+  "hooks": "./hooks/codex.json",
+  "interface": {
+    "displayName": "Previously on localhost",
+    "shortDescription": "Recap of past sessions before every turn",
+    "longDescription": "Recalls what past sessions learned in this project before each turn, saves a cliffhanger draft at the end of each turn, and indexes your past episodes with their resume commands.",
+    "developerName": "Tommaso Tosi",
+    "category": "Productivity",
+    "capabilities": ["Instructions", "Lifecycle hooks"],
+    "websiteURL": "https://github.com/tosto92/previously-on-localhost",
+    "defaultPrompt": [
+      "Where did I leave off in this project?",
+      "Have we seen this error before?",
+      "Save what we just learned as a spoiler."
+    ]
+  }
+}

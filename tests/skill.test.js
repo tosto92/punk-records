@@ -6,7 +6,7 @@ import path from "node:path";
 const root = path.resolve(import.meta.dirname, "..");
 
 test("previously skill teaches when to save and recall", () => {
-  const p = path.join(root, ".opencode", "skills", "previously", "SKILL.md");
+  const p = path.join(root, "skills", "previously", "SKILL.md");
   assert.ok(fs.existsSync(p), "SKILL.md must exist");
   const src = fs.readFileSync(p, "utf8");
   assert.match(src, /^---\nname: previously\n/, "frontmatter name");
@@ -30,7 +30,7 @@ test("previously skill teaches when to save and recall", () => {
   assert.ok(draftSection.includes("--ref claude-code-session-"), "Drafts example must use slug ref format");
   assert.ok(!/--ref "[A-Z]/.test(src), "SKILL.md example must not quote the ref with capitals");
 
-  const command = fs.readFileSync(path.join(root, ".opencode", "commands", "previously-save.md"), "utf8");
+  const command = fs.readFileSync(path.join(root, "commands", "previously-save.md"), "utf8");
   assert.ok(command.includes("-session-<id>") && command.includes("--ref"), "previously-save must document slug ref format");
   assert.ok(!/--ref "[A-Z]/.test(command), "previously-save example must not quote ref with capital letter");
 });

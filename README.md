@@ -37,18 +37,37 @@ covers: src/auth/session.ts
 
 Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for `episodes`.
 
+### As a plugin (Claude Code, Codex)
+
+```sh
+# Claude Code: hooks, MCP server, skills and /previously-save
+claude plugin marketplace add tosto92/previously-on-localhost
+claude plugin install previously@previously-on-localhost
+
+# Codex: hooks and skills
+codex plugin marketplace add tosto92/previously-on-localhost
+codex plugin add previously@previously-on-localhost
+```
+
+Codex asks you to approve new hooks once: run `/hooks` in Codex after installing.
+
+### With the CLI (all agents, including OpenCode)
+
 ```sh
 npm install -g previously-on-localhost     # or: git clone … && cd previously-on-localhost
 previously init --global                   # from a clone: node bin/previously init --global
 ```
 
 `init --global` wires every agent for all your projects: hooks (recaps and
-cliffhangers), the `previously` MCP server, the `previously` skill and a
+cliffhangers), the `previously` MCP server, the skills and a
 `/previously-save` command. It also links `~/.local/bin/previously`, the
 command the agent hooks run, so keep `~/.local/bin` on your `PATH`.
 Limit it with `--agents claude,codex,opencode`; preview with `--dry-run`.
 
-Codex asks you to approve new hooks once: run `/hooks` in Codex after `init`.
+Pick **one** of the two for each agent: the plugin and `init --global` both
+install hooks, and having both makes every recap and cliffhanger run twice.
+For example, use the plugins for Claude Code and Codex, then
+`previously init --global --agents opencode`.
 
 ## Use
 

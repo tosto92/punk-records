@@ -7,7 +7,7 @@
 /.superpowers/
 /.claude/
 /.codex/
-/.agents/
+/.agents/skills/
 /.mcp.json
 /opencode.json
 /AGENTS.md

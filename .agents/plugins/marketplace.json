@@ -1,0 +1,16 @@
+{
+  "name": "previously-on-localhost",
+  "interface": { "displayName": "Previously on localhost" },
+  "plugins": [
+    {
+      "name": "previously",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/tosto92/previously-on-localhost.git",
+        "ref": "main"
+      },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

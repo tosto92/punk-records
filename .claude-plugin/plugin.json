@@ -1,0 +1,17 @@
+{
+  "name": "previously",
+  "version": "0.1.0",
+  "description": "Session memory for coding agents: a recap of past sessions before every turn, cliffhanger drafts at turn end, and your past episodes.",
+  "author": { "name": "Tommaso Tosi", "url": "https://github.com/tosto92" },
+  "homepage": "https://github.com/tosto92/previously-on-localhost",
+  "repository": "https://github.com/tosto92/previously-on-localhost",
+  "license": "MIT",
+  "keywords": ["memory", "sessions", "recall", "mcp"],
+  "hooks": "./hooks/claude.json",
+  "mcpServers": {
+    "previously": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/previously", "mcp"]
+    }
+  }
+}

@@ -10,8 +10,14 @@
     "bin/",
     "lib/",
     ".opencode/",
+    "skills/",
+    "hooks/",
+    ".claude-plugin/",
+    ".codex-plugin/",
+    "commands/",
     "docs/",
     "LICENSE",
+    "CHANGELOG.md",
     "README.md"
   ],
   "engines": {

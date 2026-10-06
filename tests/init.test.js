@@ -184,7 +184,7 @@ test("global init wires plugin symlink and global MCP config", () => {
   assert.equal(oc.mcp["previously"].type, "local");
   // global skill symlinked
   const skillLink = path.join(fakeSkills, "previously");
-  assert.equal(fs.readlinkSync(skillLink), path.join(ROOT, ".opencode", "skills", "previously"));
+  assert.equal(fs.readlinkSync(skillLink), path.join(ROOT, "skills", "previously"));
   // repo-local files untouched by explicit global run outside a repo
   assert.ok(!fs.existsSync(path.join(tmp, "AGENTS.md")));
   assert.ok(!fs.existsSync(path.join(tmp, "opencode.json")));
