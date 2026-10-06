@@ -7,6 +7,9 @@ import {execFileSync} from 'node:child_process';
 import {saveMemory} from '../lib/save.js';
 import {loadMemories} from '../lib/build.js';
 
+// The OpenCode plugin is TypeScript (OpenCode runs it under Bun); Node loads it only with type stripping (22.18+).
+const TS = {skip: !process.features?.typescript && 'this Node cannot import .ts (type stripping needs Node 22.18+)'};
+
 // Contracts pinned to @opencode-ai/plugin 1.18.34 and @opencode/plugin/core 2.0.18.
 // V2 native write: input.path, completed result.output.target; edit/patch output.files[].file.
 async function fixture(t) {
@@ -44,7 +47,7 @@ function context(cwd) {
 }
 async function settle() {for (let i = 0; i < 8; i++) await Promise.resolve();}
 
-test('native V1 apply_patch and V2 patch capture every affected file', async t => {
+test('native V1 apply_patch and V2 patch capture every affected file', TS, async t => {
   const {cwd, plugin, memories} = await fixture(t);
   const files = ['added.js', 'changed.js', 'deleted.js'].map(file => ({file: path.join(cwd, file), patch: '', additions: 1, deletions: 1, status: 'modified'}));
   const v1 = await plugin.server({directory: cwd});
@@ -61,7 +64,7 @@ test('native V1 apply_patch and V2 patch capture every affected file', async t =
   assert.deepEqual(memories().find(m => m.title.endsWith(' V2'))?.files, ['added.js', 'changed.js', 'deleted.js']);
 });
 
-test('direct entrypoint registers one plugin; V1 sessions and hooks are isolated', async t => {
+test('direct entrypoint registers one plugin; V1 sessions and hooks are isolated', TS, async t => {
   const {cwd, module, plugin, memories} = await fixture(t);
   assert.equal(plugin.id, 'previously');
   assert.deepEqual(Object.keys(module), ['default']);
@@ -79,7 +82,7 @@ test('direct entrypoint registers one plugin; V1 sessions and hooks are isolated
   assert.equal(memories().length, 2);
 });
 
-test('V1 recall injects strings and does not capture shell, foreign or deleted sessions', async t => {
+test('V1 recall injects strings and does not capture shell, foreign or deleted sessions', TS, async t => {
   const {cwd, plugin, memories} = await fixture(t);
   saveMemory({type: 'solved', title: 'auth fix', solution: 'rotate token'}, {cwd});
   const hooks = await plugin.server({directory: cwd});
@@ -96,7 +99,7 @@ test('V1 recall injects strings and does not capture shell, foreign or deleted s
   assert.equal(memories().length, 1);
 });
 
-test('V2 uses native completed tool output and background wait; context uses text objects', async t => {
+test('V2 uses native completed tool output and background wait; context uses text objects', TS, async t => {
   const {cwd, plugin, memories} = await fixture(t);
   saveMemory({type: 'solved', title: 'auth fix', solution: 'rotate token'}, {cwd});
   const {ctx, hooks, waits, registrations} = context(cwd);
@@ -115,7 +118,7 @@ test('V2 uses native completed tool output and background wait; context uses tex
   assert.equal(registrations.every(r => r.disposed), true);
 });
 
-test('V2 rejects failed tools and foreign sessions; deletion cancels pending waits', async t => {
+test('V2 rejects failed tools and foreign sessions; deletion cancels pending waits', TS, async t => {
   const {cwd, plugin, memories} = await fixture(t);
   const {ctx, hooks, waits, emit} = context(cwd);
   const cleanup = await plugin.setup(ctx); t.after(cleanup);
@@ -128,7 +131,7 @@ test('V2 rejects failed tools and foreign sessions; deletion cancels pending wai
   assert.deepEqual(memories(), []);
 });
 
-test('autosave kill switch applies to V1 and V2', async t => {
+test('autosave kill switch applies to V1 and V2', TS, async t => {
   const {cwd, plugin, memories} = await fixture(t); process.env.PREVIOUSLY_AUTOSAVE = '0';
   const v1 = await plugin.server({directory: cwd}); await afterV1(v1, 'A', path.join(cwd, 'a.js')); await idleV1(v1, 'A');
   const {ctx, hooks, waits} = context(cwd); const cleanup = await plugin.setup(ctx); t.after(cleanup);

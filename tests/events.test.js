@@ -74,7 +74,8 @@ test("save appends one atomic line and readEvents round-trips, skipping bad line
 });
 
 test("default scope is repo inside git, global outside", () => {
-  const inside = fs.mkdtempSync(path.join(os.tmpdir(), "previously-repo-"));
+  // realpath: on macOS os.tmpdir() is a /var symlink to /private/var, and git reports the real path.
+  const inside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "previously-repo-")));
   execFileSync("git", ["init", "-q"], { cwd: inside });
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), "previously-out-"));
   assert.deepEqual(resolveScopes({}, inside).writes, ["local"]);

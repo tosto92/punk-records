@@ -269,7 +269,8 @@ test("ref event before its target still merges into one node", () => {
 });
 
 test("buildAll default builds both global and repo scopes inside a repo", () => {
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "previously-build-both-repo-"));
+  // realpath: on macOS os.tmpdir() is a /var symlink to /private/var, and git reports the real path.
+  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "previously-build-both-repo-")));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-build-both-home-"));
   execFileSync("git", ["init", "-q"], { cwd: repo });
   const prevHome = process.env.PREVIOUSLY_HOME;
