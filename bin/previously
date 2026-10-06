@@ -145,8 +145,48 @@ function cmdCheck(args) {
   process.exit(stale ? 1 : 0);
 }
 
+const HELP = `previously — session memory for coding agents (Claude Code, Codex, OpenCode)
+
+usage: previously <command> [flags]
+
+  init [--global|--local] [--agents opencode,claude,codex] [--opencode-api v1|v2] [--dry-run]
+                     wire hooks, MCP server and skill (repo, or every repo with --global)
+  ask <query> [--limit n] [--scope local|global|all]
+                     recall memories matching symptoms, errors or file names
+  save --type <solved|attempt_failed|decision|note> --title <s> [--symptoms s] [--solution s]
+       [--attempt a]... [--files f]... [--tags a,b] [--ref slug] [--global|--local]
+                     save a spoiler (or update one with --ref)
+  graph [--serve] [--open] [--port n] [--scope local|global|all] [--all-projects] [--no-drafts] [--out file]
+                     browse memories in a local web viewer
+  build              regenerate the derived Markdown index
+  check              report files whose memories may be stale
+  migrate [--apply]  upgrade old event logs
+  mcp                run the MCP server (stdio)
+  hook <agent> <event>
+                     agent hook entry point (installed by init)
+
+  -h, --help         show this help
+  -v, --version      show the version`;
+
+const [major, minor] = process.versions.node.split(".").map(Number);
+if (major < 20 || (major === 20 && minor < 11)) {
+  console.error(`previously: Node.js >= 20.11 required (found ${process.versions.node})`);
+  process.exit(2);
+}
+
 const [sub, ...rest] = process.argv.slice(2);
 switch (sub) {
+  case "-h":
+  case "--help":
+  case "help":
+    console.log(HELP);
+    break;
+  case "-v":
+  case "--version": {
+    const pkg = new URL("../package.json", import.meta.url);
+    console.log(JSON.parse(fs.readFileSync(pkg, "utf8")).version);
+    break;
+  }
   case 'migrate': {
     try {
       let explicit = null, apply = false, dryRun = false, expectedSource = null, refs = {};
@@ -299,9 +339,9 @@ switch (sub) {
     break;
   }
   case undefined:
-    console.error("usage: previously <subcommand> [flags]");
+    console.error(HELP);
     process.exit(2);
   default:
-    console.error(`previously: '${sub}' not implemented`);
+    console.error(`previously: unknown command '${sub}' (see previously --help)`);
     process.exit(2);
 }

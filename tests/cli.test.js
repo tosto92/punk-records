@@ -55,3 +55,16 @@ test('init writes the chosen API format and rejects an unknown one', t => {
   assert.match(bad.stderr, /opencode-api/);
   assert.equal(run(['--nope']).status, 2);
 });
+
+test('--help lists every command, --version matches package.json, unknown commands point to help', () => {
+  const cli = path.resolve(import.meta.dirname, '../bin/previously');
+  const run = args => spawnSync(process.execPath, [cli, ...args], {encoding: 'utf8'});
+  const help = run(['--help']);
+  assert.equal(help.status, 0);
+  for (const cmd of ['init', 'ask', 'save', 'graph', 'build', 'check', 'migrate', 'mcp', 'hook']) assert.match(help.stdout, new RegExp(`^  ${cmd}\\b`, 'm'));
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'));
+  assert.equal(run(['--version']).stdout.trim(), pkg.version);
+  const bad = run(['nope']);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /unknown command 'nope'.*--help/);
+});

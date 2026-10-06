@@ -1,0 +1,39 @@
+{
+  "name": "previously-on-localhost",
+  "version": "0.1.0",
+  "description": "Session memory for coding agents (Claude Code, Codex, OpenCode): a recap of past sessions before every turn.",
+  "type": "module",
+  "bin": {
+    "previously": "bin/previously"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    ".opencode/",
+    "docs/",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "opencode",
+    "mcp",
+    "agent-memory",
+    "coding-agents"
+  ],
+  "author": "Tommaso Tosi (https://github.com/tosto92)",
+  "license": "MIT",
+  "homepage": "https://github.com/tosto92/previously-on-localhost#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tosto92/previously-on-localhost.git"
+  },
+  "bugs": "https://github.com/tosto92/previously-on-localhost/issues"
+}
