@@ -47,6 +47,7 @@ test("repo init wires Claude Code: MCP, hooks, CLAUDE.md, skill, command", (t) =
   assert.equal(settings.hooks.PostToolUse[0].matcher, "Write|Edit|MultiEdit|NotebookEdit");
   assert.match(fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8"), /<!-- previously:start -->/);
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "previously")), SKILL);
+  assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "previously-episodes")), path.join(ROOT, ".opencode", "skills", "previously-episodes"));
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "commands", "previously-save.md")), COMMAND);
   assert.equal(fs.existsSync(path.join(repo, "opencode.json")), false, "opencode not requested");
   assert.equal(fs.existsSync(path.join(repo, "AGENTS.md")), false, "AGENTS.md is for opencode/codex");

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Previously on localhost — episodes</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #fff; --fg: #1d1d1b; --muted: #75746f; --line: #e4e3de;
+    --accent: #2f6fd6; --claude: #c96442; --codex: #10a37f; --hover: #f0efeb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --panel: #1f1f1d; --fg: #ecebe6; --muted: #9a9993; --line: #33322f;
+            --accent: #7aa7f0; --claude: #e08a6a; --codex: #3ccf9f; --hover: #2a2927; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center;
+           padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  input, select, button { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line);
+                          border-radius: 6px; padding: 5px 8px; }
+  input { flex: 1; max-width: 420px; }
+  button { cursor: pointer; }
+  main { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 53px); }
+  aside { border-right: 1px solid var(--line); overflow-y: auto; max-height: calc(100vh - 53px); position: sticky; top: 53px; }
+  .proj { padding: 8px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .proj:hover, .proj.on { background: var(--hover); }
+  .proj b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .muted { color: var(--muted); font-size: 12px; }
+  #tl { padding: 8px 20px 40px; }
+  .day { margin: 18px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .pgroup { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
+  .pgroup > .ph { padding: 8px 12px; border-bottom: 1px solid var(--line); font-weight: 600; }
+  .sess { display: grid; grid-template-columns: 96px 58px 1fr; gap: 8px; padding: 6px 12px; cursor: pointer; }
+  .sess:hover { background: var(--hover); }
+  .tool { font-size: 12px; font-weight: 600; }
+  .tool.claude { color: var(--claude); } .tool.codex { color: var(--codex); }
+  .branch { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: var(--hover); color: var(--muted); margin-left: 6px; }
+  dialog { width: min(900px, 94vw); max-height: 86vh; border: 1px solid var(--line); border-radius: 10px;
+           background: var(--panel); color: var(--fg); padding: 0; }
+  dialog::backdrop { background: #0006; }
+  .dh { position: sticky; top: 0; background: var(--panel); padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .cmd { display: flex; gap: 8px; margin-top: 8px; }
+  .cmd code { flex: 1; overflow-x: auto; white-space: nowrap; padding: 5px 8px; background: var(--bg); border-radius: 6px; font-size: 12px; }
+  .prompt { padding: 10px 18px; border-bottom: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; }
+  .prompt .muted { display: block; }
+  @media (max-width: 720px) { main { grid-template-columns: 1fr; } aside { position: static; max-height: 240px; border-right: 0; border-bottom: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Episodes</h1>
+  <input id="q" type="search" placeholder="Filter: project, title, branch, prompt…">
+  <select id="days">
+    <option value="1">today</option><option value="3">3 days</option>
+    <option value="7" selected>7 days</option><option value="30">30 days</option><option value="365">1 year</option>
+  </select>
+</header>
+<main>
+  <aside id="projects"></aside>
+  <section id="tl"></section>
+</main>
+<dialog id="dlg"></dialog>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const home = s => (s || "?").replace(/^\/home\/[^/]+/, "~");
+const t = (ts, o) => new Date(ts * 1000).toLocaleString(undefined, o);
+const hm = ts => t(ts, {hour: "2-digit", minute: "2-digit"});
+const cut = (s, n = 110) => { s = String(s || "").replace(/\s+/g, " "); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+const copyBtn = cmd => `<button onclick="navigator.clipboard.writeText(${esc(JSON.stringify(cmd))}); this.textContent='copied'">copy</button>`;
+
+async function load() {
+  const q = $("#q").value, days = $("#days").value;
+  localStorage.setItem("previously-episodes", JSON.stringify({q, days}));
+  const d = await (await fetch(`/api/data?q=${encodeURIComponent(q)}&days=${days}`)).json();
+
+  $("#projects").innerHTML = d.projects.map(p => `
+    <div class="proj ${q === p.project ? "on" : ""}" data-p="${esc(p.project)}">
+      <b title="${esc(p.project)}">${esc(home(p.project))}</b>
+      <div class="muted">${t(p.last_ts, {dateStyle: "short", timeStyle: "short"})} · ${p.ns} episodes · ${p.days} days</div>
+      <div class="muted">${esc(cut(p.last.title || p.last.first, 60))}</div>
+    </div>`).join("");
+
+  const days_ = {};
+  for (const r of d.timeline) ((days_[r.day] ??= {})[r.project] ??= []).push(r);
+  $("#tl").innerHTML = Object.entries(days_).map(([day, projs]) => `
+    <div class="day">${t(new Date(day).getTime() / 1000 + 43200, {weekday: "long", day: "numeric", month: "long"})}</div>
+    ${Object.entries(projs).map(([p, ss]) => `
+      <div class="pgroup">
+        <div class="ph">${esc(home(p))} <span class="muted">· ${ss.length} episodes, ${ss.reduce((a, s) => a + s.dn, 0)} prompt</span></div>
+        ${ss.map(s => `
+          <div class="sess" data-id="${esc(s.id)}">
+            <span class="muted">${hm(s.t0)}–${hm(s.t1)}</span>
+            <span class="tool ${esc(s.tool)}">${esc(s.tool)}</span>
+            <span>${esc(cut(s.title || s.first))}${s.branch ? `<span class="branch">${esc(s.branch)}</span>` : ""}
+              <span class="muted"> · ${s.dn} prompt</span></span>
+          </div>`).join("")}
+      </div>`).join("")}`).join("") || `<p class="muted">No activity in this period.</p>`;
+}
+
+async function openSession(id) {
+  const {session: s, prompts} = await (await fetch(`/api/session?id=${encodeURIComponent(id)}`)).json();
+  $("#dlg").innerHTML = `
+    <div class="dh">
+      <b>${esc(s.title || cut(s.first, 80))}</b>
+      <div class="muted">${esc(s.tool)} · ${esc(home(s.cwd))}${s.branch ? " · " + esc(s.branch) : ""} · ${s.n} prompts</div>
+      <div class="cmd"><code>${esc(s.resume)}</code>${copyBtn(s.resume)}<button onclick="dlg.close()">chiudi</button></div>
+    </div>
+    ${prompts.map(p => `<div class="prompt"><span class="muted">${t(p.ts, {dateStyle: "short", timeStyle: "short"})}</span>${esc(p.text)}</div>`).join("")}`;
+  $("#dlg").showModal();
+  $("#dlg .prompt:last-child")?.scrollIntoView();
+}
+
+$("#projects").onclick = e => { const p = e.target.closest(".proj"); if (p) { $("#q").value = $("#q").value === p.dataset.p ? "" : p.dataset.p; load(); } };
+$("#tl").onclick = e => { const s = e.target.closest(".sess"); if (s) openSession(s.dataset.id); };
+$("#dlg").onclick = e => { if (e.target === $("#dlg")) $("#dlg").close(); };
+let timer; $("#q").oninput = () => { clearTimeout(timer); timer = setTimeout(load, 250); };
+$("#days").onchange = load;
+try { const s = JSON.parse(localStorage.getItem("previously-episodes")); if (s) { $("#q").value = s.q || ""; $("#days").value = s.days || 7; } } catch {}
+load();
+setInterval(() => document.hidden || $("#dlg").open || load(), 60000);
+</script>
+</body>
+</html>

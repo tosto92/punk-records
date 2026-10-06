@@ -8,6 +8,8 @@ import { serve } from "../lib/mcp.js";
 import { initRepo } from "../lib/init.js";
 import { writeGraph, serveGraph, openBrowser, } from "../lib/graph.js";
 import fs from 'node:fs';
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { migrateScope } from '../lib/migrate.js';
 import { handleHook } from "../lib/hook.js";
 
@@ -161,6 +163,8 @@ usage: previously <command> [flags]
   build              regenerate the derived Markdown index
   check              report files whose memories may be stale
   migrate [--apply]  upgrade old event logs
+  episodes [timeline|projects|show <id>|serve] [filter] [-n N] [-d D]
+                     past Claude Code / Codex sessions and how to resume them (needs python3)
   mcp                run the MCP server (stdio)
   hook <agent> <event>
                      agent hook entry point (installed by init)
@@ -323,6 +327,16 @@ switch (sub) {
     }
     for (const t of touched) console.log(t);
     break;
+  }
+  case "episodes": {
+    const script = fileURLToPath(new URL("../lib/episodes/sessions.py", import.meta.url));
+    const python = process.env.PREVIOUSLY_PYTHON || "python3";
+    const res = spawnSync(python, [script, ...rest], { stdio: "inherit" });
+    if (res.error) {
+      console.error(`previously: episodes needs Python 3.9+ (${python}: ${res.error.code ?? res.error.message})`);
+      process.exit(2);
+    }
+    process.exit(res.status ?? 1);
   }
   case "hook": {
     // Agent hooks must never block or fail the session: always exit 0.

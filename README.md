@@ -15,6 +15,7 @@ of what past sessions learned in this project, the way a TV show opens with
 | **recap** | memories injected automatically when a prompt matches |
 | **spoiler** | a saved memory: the fix, the decision, the attempt that failed |
 | **cliffhanger** | the draft saved automatically at the end of a turn, listing the files the session edited |
+| **episodes** | your past Claude Code and Codex sessions, and how to resume them |
 
 ## What the agent sees
 
@@ -34,7 +35,7 @@ covers: src/auth/session.ts
 
 ## Install
 
-Requires Node.js 20.11 or later, and git for per-repo memory.
+Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for `episodes`.
 
 ```sh
 npm install -g previously-on-localhost     # or: git clone … && cd previously-on-localhost
@@ -63,6 +64,21 @@ Agents mostly do this themselves: the skill tells them to recall before
 exploring and to save what generalizes. Memory types: `solved`,
 `attempt_failed`, `decision`, `note`.
 
+## Episodes
+
+```sh
+previously episodes                 # recent sessions, each with its resume command
+previously episodes projects        # per project: where you left off
+previously episodes timeline -d 7   # day → project → sessions
+previously episodes show 0b5e1d2c   # every prompt of one session
+previously episodes serve           # the same in a local web page
+```
+
+A read-only SQLite index of `~/.claude` and `~/.codex` (or `CLAUDE_CONFIG_DIR` /
+`CODEX_HOME`), synced on every call into `~/.local/share/previously/episodes.db`.
+Needs Python 3.9+. The `previously-episodes` skill lets the agent answer
+"where was I?" itself.
+
 ## Where memories live
 
 | Scope | Location | Share it? |
@@ -84,8 +100,8 @@ Set `PREVIOUSLY_AUTOSAVE=0` to keep recaps but stop cliffhanger drafts.
   `previously hook`), `~/.claude.json` and `~/.config/opencode/opencode.json`
   (MCP server `previously`), `~/.codex/config.toml` (block between
   `# previously:start` and `# previously:end`), and the links
-  `~/.claude/skills/previously`, `~/.claude/commands/previously-save.md`,
-  `~/.codex/skills/previously`, `~/.config/opencode/skills/previously`,
+  `~/.claude/skills/previously*`, `~/.claude/commands/previously-save.md`,
+  `~/.codex/skills/previously*`, `~/.config/opencode/skills/previously*`,
   `~/.config/opencode/plugins/previously.ts`, `~/.local/bin/previously`;
 - per repo: the same entries in `.claude/`, `.codex/`, `.agents/`,
   `.opencode/`, `.mcp.json`, `opencode.json`, and the block between
