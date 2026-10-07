@@ -87,6 +87,26 @@ For example, use the plugins for Claude Code and Codex, then
 
 ## Use
 
+### Just ask your agent
+
+The skills teach the agent when and how to recall and save, so plain requests
+work, in any language. Name the skill to be explicit: `/previously` in Claude
+Code and OpenCode, `$previously` in Codex. With the Claude Code plugin, skills
+are namespaced: `/previously:previously`. Claude Code also gets a
+`/previously-save` command that walks the agent through saving one memory.
+
+| You say | The agent runs |
+|---|---|
+| *Have we seen this error before?* | `previously ask "<the error, the files involved>"` |
+| `/previously-save` *remember how we fixed the 401 loop* | `previously save --type solved --title … --solution … --files …` |
+| *Save this as a global memory: I always use pnpm, never npm* | `previously save --global --type decision …` |
+| *That approach didn't work, keep it so nobody retries it* | `previously save --type attempt_failed …` |
+| *Turn this session's cliffhanger into a proper spoiler* | `previously save --ref <draft slug> --type solved …` |
+| *Where did I leave off on the api project?* | `previously episodes projects api`, then the resume command |
+| *What did I work on yesterday?* | `previously episodes timeline -d 2` |
+
+### From the command line
+
 ```sh
 previously init                   # optional, in a repo: commit agent config for your team
 previously ask "<symptoms, errors or file names>"
