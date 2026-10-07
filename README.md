@@ -101,7 +101,7 @@ are namespaced: `/previously:previously`. Claude Code also gets a
 | `/previously-save` *remember how we fixed the 401 loop* | `previously save --type solved --title … --solution … --files …` |
 | *Save this as a global memory: I always use pnpm, never npm* | `previously save --global --type decision …` |
 | *That approach didn't work, keep it so nobody retries it* | `previously save --type attempt_failed …` |
-| *Turn this session's cliffhanger into a proper spoiler* | `previously save --ref <draft slug> --type solved …` |
+| *Turn this session's draft into a proper memory* (or: *this cliffhanger into a spoiler*) | `previously save --ref <draft slug> --type solved …` |
 | *Where did I leave off on the api project?* | `previously episodes projects api`, then the resume command |
 | *What did I work on yesterday?* | `previously episodes timeline -d 2` |
 
