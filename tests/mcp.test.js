@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { handleMessage } from '../lib/mcp.js';
 
@@ -20,6 +20,31 @@ test('MCP rejects wrong field shapes and traversal without append', (t) => {
 });
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+test('MCP validates envelopes before treating them as notifications', () => {
+  const ctx = {cwd: ROOT, flagExplicit: null};
+  for (const msg of [null, true, 42, 'text', [], {}, {id: 1}, {jsonrpc: '1.0', method: 'tools/list'},
+    {jsonrpc: '2.0', method: 2}, {jsonrpc: '2.0', method: 'tools/list', id: {}},
+    {jsonrpc: '2.0', method: 'tools/list', params: null}]) {
+    const res = handleMessage(msg, ctx);
+    assert.equal(res.error.code, -32600);
+  }
+  assert.equal(handleMessage({jsonrpc: '2.0', method: 'notifications/initialized'}, ctx), null);
+  assert.ok(handleMessage({jsonrpc: '2.0', id: null, method: 'tools/list'}, ctx).result.tools);
+});
+
+test('MCP continues on the same process after malformed JSON and invalid envelopes', () => {
+  const messages = [null, 1, [], {}, {jsonrpc: '2.0', method: 'notifications/initialized'},
+    {jsonrpc: '2.0', id: 'after-invalid', method: 'tools/list'}];
+  const res = spawnSync(process.execPath, [path.join(ROOT, 'bin', 'previously'), 'mcp'], {
+    cwd: ROOT, input: '{broken\n' + messages.map(JSON.stringify).join('\n') + '\n', encoding: 'utf8', timeout: 5000,
+  });
+  assert.equal(res.status, 0, res.stderr);
+  const replies = res.stdout.trim().split('\n').map(JSON.parse);
+  assert.deepEqual(replies.slice(0, -1).map(r => r.error.code), [-32700, -32600, -32600, -32600, -32600]);
+  assert.equal(replies.at(-1).id, 'after-invalid');
+  assert.equal(replies.at(-1).result.tools.length, 3);
+});
 
 function renderMd(m) {
   return [

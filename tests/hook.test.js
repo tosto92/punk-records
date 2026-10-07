@@ -7,6 +7,7 @@ import {execFileSync, spawnSync} from 'node:child_process';
 import {handleHook, spoolPath, RECALL_OUTPUT} from '../lib/hook.js';
 import {saveMemory} from '../lib/save.js';
 import {loadMemories} from '../lib/build.js';
+import {collectMemories, contextGraph} from '../lib/graph.js';
 
 const BIN = path.resolve(import.meta.dirname, '..', 'bin', 'previously');
 const FIXTURES = path.join(import.meta.dirname, 'fixtures', 'hooks');
@@ -75,6 +76,30 @@ test('a failed tool call records nothing', async t => {
   await handleHook('claude', 'PostToolUse', {...write(cwd, 'a.js'), tool_response: {success: false}});
   await handleHook('claude', 'PostToolUse', {...write(cwd, 'b.js'), tool_response: {error: 'EACCES'}});
   assert.equal(fs.existsSync(spoolPath('claude', 'sess-1')), false);
+});
+
+test('Claude and Codex Stops preserve promoted memories and show them without drafts', async t => {
+  t.mock.timers.enable({apis: ['Date'], now: 1000});
+  const {cwd, memories} = fixture(t);
+  for (const agent of ['claude', 'codex']) {
+    await handleHook(agent, 'UserPromptSubmit', ev(cwd, {prompt: 'original problem'}));
+    await handleHook(agent, 'PostToolUse', fixturePayload(`${agent}-PostToolUse`, cwd));
+    await handleHook(agent, 'Stop', ev(cwd));
+    const draft = memories().find(m => m.title.startsWith(agent === 'claude' ? 'Claude Code' : 'Codex'));
+    t.mock.timers.tick(1);
+    saveMemory({ref: draft.memoryId, type: 'solved', solution: 'verified fix'}, {cwd});
+    const promoted = memories().find(m => m.memoryId === draft.memoryId);
+    const file = path.join(cwd, 'memory', 'events.jsonl');
+    const before = fs.readFileSync(file, 'utf8');
+    t.mock.timers.tick(1);
+    await handleHook(agent, 'UserPromptSubmit', ev(cwd, {prompt: 'later unrelated problem'}));
+    await handleHook(agent, 'PostToolUse', fixturePayload(`${agent}-PostToolUse`, cwd));
+    await handleHook(agent, 'Stop', ev(cwd));
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+    assert.deepEqual(memories().find(m => m.memoryId === draft.memoryId), promoted);
+    assert.equal(contextGraph([promoted]).nodes[0].type, 'solved');
+    assert.ok(collectMemories({repoRoot: cwd}, 'local', {drafts: false}).some(m => m.memoryId === draft.memoryId));
+  }
 });
 
 test('Codex payloads captured from the real CLI produce a Codex draft', async t => {

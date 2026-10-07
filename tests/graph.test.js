@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createServer } from 'node:net';
 
 import { edgesOf, graphHtml, writeGraph, contextGraph, collectMemories } from "../lib/graph.js";
 import { repoDir, resolveScopes } from "../lib/paths.js";
@@ -152,4 +153,54 @@ test('the web viewer carries no graft branding; only its LICENSE names the origi
     assert.doesNotMatch(fs.readFileSync(path.resolve('lib/viewer', f), 'utf8'), /graft/i, f);
   }
   assert.match(fs.readFileSync(path.resolve('lib/viewer/LICENSE'), 'utf8'), /MIT License[\s\S]*Copyright/);
+});
+
+test('serveGraph supports an ephemeral port and closes the listener', () => {
+  const script = `
+    import assert from 'node:assert/strict';
+    import {serveGraph} from './lib/graph.js';
+    const timeout = setTimeout(() => process.exit(2), 2000);
+    try {
+      const server = await serveGraph({repoRoot: null}, {port: 0, scope: 'local'});
+      const port = Number(new URL(server.url).port);
+      assert.ok(port > 0);
+      assert.equal((await fetch(server.url)).status, 200);
+      await server.close();
+      await assert.rejects(fetch(server.url));
+      clearTimeout(timeout);
+    } catch (err) {console.error(err); process.exit(1);}
+  `;
+  const res = spawnSync(process.execPath, ['--input-type=module', '-e', script], {encoding: 'utf8', timeout: 4000});
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test('serveGraph skips an occupied port', async t => {
+  const {serveGraph} = await import('../lib/graph.js');
+  const blocker = createServer();
+  await new Promise(resolve => blocker.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => blocker.close(resolve)));
+  const port = blocker.address().port;
+  const server = await serveGraph({repoRoot: null}, {scope: 'local', port});
+  t.after(() => server.close());
+  assert.ok(Number(new URL(server.url).port) > port);
+  assert.equal((await fetch(server.url)).status, 200);
+});
+
+test('serveGraph rejects listen errors without an unhandled rejection', async () => {
+  const {serveGraph} = await import('../lib/graph.js');
+  await assert.rejects(serveGraph({repoRoot: null}, {port: 65536}), /port/i);
+  const script = `
+    import assert from 'node:assert/strict';
+    import {Server} from 'node:net';
+    import {serveGraph} from './lib/graph.js';
+    const timeout = setTimeout(() => process.exit(2), 2000);
+    Server.prototype.listen = function () {
+      queueMicrotask(() => this.emit('error', Object.assign(new Error('permission denied'), {code: 'EACCES'})));
+      return this;
+    };
+    await assert.rejects(serveGraph({repoRoot: null}), {code: 'EACCES'});
+    clearTimeout(timeout);
+  `;
+  const res = spawnSync(process.execPath, ['--input-type=module', '-e', script], {encoding: 'utf8', timeout: 4000});
+  assert.equal(res.status, 0, res.stderr);
 });

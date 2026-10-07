@@ -105,6 +105,8 @@ are namespaced: `/previously:previously`. Claude Code also gets a
 | *Where did I leave off on the api project?* | `previously episodes projects api`, then the resume command |
 | *What did I work on yesterday?* | `previously episodes timeline -d 2` |
 
+After you promote a draft, later automatic captures from that session leave the memory unchanged.
+
 ### From the command line
 
 ```sh

@@ -41,3 +41,50 @@ test('episodes without Python says so instead of crashing', () => {
   assert.equal(res.status, 2);
   assert.match(res.stderr, /episodes needs Python 3\.9\+/);
 });
+
+test('resume commands quote paths and session IDs as single shell arguments', {skip: !hasPython && 'python3 not found'}, () => {
+  const res = spawnSync('python3', ['-c', `
+import importlib.util, shlex
+spec = importlib.util.spec_from_file_location('episodes', 'lib/episodes/sessions.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+for tool in ('claude', 'codex'):
+    cwd = "/tmp/my project/it's $HOME; echo unsafe"
+    sid = "session id'; echo unsafe"
+    r = {'tool': tool, 'cwd': cwd, 'id': sid}
+    assert shlex.split(m.resume(r)) == ['cd', cwd, '&&', tool, '--resume' if tool == 'claude' else 'resume', sid]
+`], {cwd: path.dirname(path.dirname(CLI)), encoding: 'utf8'});
+  assert.equal(res.status, 0, res.stderr);
+});
+
+test('episode searches find intermediate prompts consistently without duplicate sessions', {skip: !hasPython && 'python3 not found'}, () => {
+  const res = spawnSync('python3', ['-c', `
+import importlib.util, sqlite3, time
+spec = importlib.util.spec_from_file_location('episodes', 'lib/episodes/sessions.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+db = sqlite3.connect(':memory:'); db.row_factory = sqlite3.Row; db.executescript(m.SCHEMA)
+now = time.mktime((*time.localtime()[:3], 12, 0, 0, 0, 0, -1))
+for sid, title, branch in [('wanted', 'Auth title', 'feature/auth'), ('other', 'Unrelated', 'main'), ('old', 'Earlier', 'main')]:
+    db.execute('INSERT INTO sessions(id,tool,cwd,project,title,branch) VALUES(?,?,?,?,?,?)',
+               (sid, 'claude', '/p/demo', '/p/demo', title, branch))
+for i, text in enumerate(['first', 'needle inside', 'needle again', 'last']):
+    db.execute('INSERT INTO prompts VALUES(?,?,?)', ('wanted', now - 100 + i, text))
+db.execute('INSERT INTO prompts VALUES(?,?,?)', ('other', now, 'unrelated prompt'))
+db.execute('INSERT INTO prompts VALUES(?,?,?)', ('old', now - 5 * 86400, 'older unrelated prompt'))
+for query in ('needle', 'Auth title', 'feature/auth'):
+    assert [r['id'] for r in m.rows(db, query)] == ['wanted'], query
+    timeline = m.timeline_rows(db, query, 7)
+    assert [r['id'] for r in timeline] == ['wanted'], query
+    assert timeline[0]['dn'] == 4
+    projects = m.project_rows(db, query)
+    assert len(projects) == 1, query
+    assert projects[0]['last']['id'] == 'wanted', query
+    assert projects[0]['days'] == 1, query
+assert m.rows(db, 'absent') == []
+assert m.timeline_rows(db, 'absent', 7) == []
+assert m.project_rows(db, 'absent') == []
+assert len(m.rows(db, '')) == 3
+assert m.project_rows(db, '')[0]['last']['id'] == 'other'
+assert m.project_rows(db, '')[0]['days'] == 2
+`], {cwd: path.dirname(path.dirname(CLI)), encoding: 'utf8'});
+  assert.equal(res.status, 0, res.stderr);
+});

@@ -91,6 +91,20 @@ test('concurrent CLI writers keep every complete event searchable', async t => {
   assert.deepEqual(fs.readdirSync(dir), ['events.jsonl']);
 });
 
+test('save refuses an unterminated register without changing its bytes', async t => {
+  const {dir, save, options, resolved} = await setup(t);
+  save({type: 'note', title: 'existing memory'}, options);
+  const file = path.join(dir, 'events.jsonl');
+  const complete = fs.readFileSync(file, 'utf8');
+  for (const tail of ['{"v":2', complete.trimEnd()]) {
+    const before = complete + tail;
+    fs.writeFileSync(file, before);
+    assert.throws(() => save({type: 'note', title: 'new memory'}, options), /incomplete trailing line/);
+    assert.equal(fs.readFileSync(file, 'utf8'), before);
+    assert.equal(search({query: 'new memory', resolved}).some(m => m.title === 'new memory'), false);
+  }
+});
+
 test('save rejects event-register symlink without touching its target', async t => {
   const {dir, save, options} = await setup(t);
   const outside = path.join(dir, 'outside'); fs.writeFileSync(outside, 'original');

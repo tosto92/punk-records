@@ -12,7 +12,7 @@ usage:
 Every run syncs incrementally from ~/.claude and ~/.codex first (CLAUDE_CONFIG_DIR
 and CODEX_HOME are honoured). Read-only: agent files are never modified.
 """
-import glob, json, os, re, sqlite3, sys, time
+import glob, json, os, re, shlex, sqlite3, sys, time
 from collections import defaultdict
 from pathlib import Path
 
@@ -107,15 +107,17 @@ def short(p):
 
 
 def resume(r):
-    cmd = f"claude --resume {r['id']}" if r["tool"] == "claude" else f"codex resume {r['id']}"
-    return f"cd {r['cwd']} && {cmd}"
+    sid = shlex.quote(r['id'])
+    cmd = f"claude --resume {sid}" if r["tool"] == "claude" else f"codex resume {sid}"
+    return f"cd {shlex.quote(str(r['cwd']))} && {cmd}"
 
 
 def hhmm(ts, fmt="%H:%M"):
     return time.strftime(fmt, time.localtime(ts))
 
 
-FLT = " AND (project || ' ' || IFNULL(title,'') || ' ' || IFNULL(branch,'') || ' ' || first || ' ' || last) LIKE ?"
+FLT = """ AND ((project || ' ' || IFNULL(title,'') || ' ' || IFNULL(branch,'')) LIKE ?
+         OR EXISTS (SELECT 1 FROM prompts matched WHERE matched.session_id = v.id AND matched.text LIKE ?))"""
 
 
 def rows(db, flt, since=0):
@@ -123,7 +125,7 @@ def rows(db, flt, since=0):
     args = [since]
     if flt:
         q += FLT
-        args.append(f"%{flt}%")
+        args.extend([f"%{flt}%"] * 2)
     return db.execute(q + " ORDER BY ended DESC", args).fetchall()
 
 
@@ -148,17 +150,19 @@ def timeline_rows(db, flt, days):
             FROM prompts p JOIN v ON v.id = p.session_id
             WHERE p.ts >= ? AND v.id IN (SELECT id FROM v WHERE 1{FLT if flt else ''})
             GROUP BY day, v.id ORDER BY day DESC, t1 DESC"""
-    return db.execute(q, [time.time() - days * 86400] + ([f"%{flt}%"] if flt else [])).fetchall()
+    return db.execute(q, [time.time() - days * 86400] + ([f"%{flt}%"] * 2 if flt else [])).fetchall()
 
 
 def project_rows(db, flt):
-    q = """SELECT project, COUNT(*) ns, SUM(n) np, MAX(ended) last_ts,
+    args = [f"%{flt}%"] * 2 if flt else []
+    matched = f" AND s.id IN (SELECT id FROM v WHERE 1{FLT})" if flt else ""
+    q = f"""SELECT project, COUNT(*) ns, SUM(n) np, MAX(ended) last_ts,
                   (SELECT COUNT(DISTINCT date(p.ts,'unixepoch','localtime')) FROM prompts p
-                   JOIN sessions s ON s.id = p.session_id WHERE s.project = v.project) days
-           FROM v WHERE (? = '' OR project LIKE ?) GROUP BY project ORDER BY last_ts DESC"""
+                   JOIN sessions s ON s.id = p.session_id WHERE s.project = v.project{matched}) days
+           FROM v WHERE 1{FLT if flt else ''} GROUP BY project ORDER BY last_ts DESC"""
     out = []
-    for p in db.execute(q, (flt, f"%{flt}%")):
-        r = db.execute("SELECT * FROM v WHERE project=? ORDER BY ended DESC LIMIT 1", (p["project"],)).fetchone()
+    for p in db.execute(q, args * 2):
+        r = db.execute(f"SELECT * FROM v WHERE project=?{FLT if flt else ''} ORDER BY ended DESC LIMIT 1", [p["project"], *args]).fetchone()
         out.append({**dict(p), "last": dict(r)})
     return out
 

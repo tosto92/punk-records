@@ -2,6 +2,7 @@
 # written on a developer machine (they carry absolute paths and session data).
 /memory/
 /graft/
+/.ignore
 /.worktrees/
 /.nova-tracer/
 /.superpowers/
