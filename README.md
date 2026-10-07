@@ -86,7 +86,7 @@ For example, use the plugins for Claude Code and Codex, then
 ## Use
 
 ```sh
-previously init                   # in a repo: project memory + agent config for this repo only
+previously init                   # optional, in a repo: commit agent config for your team
 previously ask "<symptoms, errors or file names>"
 previously save --type solved --title "…" --symptoms "…" --solution "…" --files src/a.ts
 previously graph --serve --open   # browse memories in a local web viewer
@@ -124,16 +124,33 @@ Needs Python 3.9+. The `previously-episodes` skill lets the agent answer
 
 ## Where memories live
 
-| Scope | Location | Share it? |
-|---|---|---|
-| repo | `memory/events.jsonl` in the project | yes: commit it and your team gets the recaps |
-| global | `~/.local/share/previously` (override with `PREVIOUSLY_HOME`) | no: personal, across all projects |
+With only `previously init --global`, per-project memory starts on its own:
+there is nothing to run in each repo. Every save, by you, the agent or a
+cliffhanger, lands in the nearest project:
 
-Outside git, `previously init --local` marks a folder as a project with a
-`.previously` file. `previously build` regenerates browsable Markdown from the
-event log; `previously check` lists memories whose files changed since.
+| Where the session works | Where memories are saved |
+|---|---|
+| inside a git repo | `<repo>/memory/events.jsonl`, created on the first save |
+| a folder marked with `.previously` | `<folder>/memory/events.jsonl` |
+| anywhere else | the global store, `~/.local/share/previously` (override with `PREVIOUSLY_HOME`) |
 
-Set `PREVIOUSLY_AUTOSAVE=0` to keep recaps but stop cliffhanger drafts.
+Recaps always read both the project's memories and your global ones. Use
+`previously save --global` for knowledge that applies to every project, and
+`--local` to force the project.
+
+- **Folders without git:** run `previously init --local` once. It writes the
+  `.previously` marker, and the folder gets its own memory from then on.
+- **Sharing with a team:** run `previously init` in the repo and commit what it
+  writes. Teammates who clone get the hooks, skills and MCP server without any
+  global install, `AGENTS.md`/`CLAUDE.md` tell their agents how to recall and
+  save, and `.gitattributes` gets `memory/events.jsonl merge=union` so the
+  memory log never conflicts on merge. A repo only you use doesn't need it.
+- **Keeping a repo's memories private:** `memory/` is a normal folder that git
+  will offer to commit; add `memory/` to that repo's `.gitignore`.
+
+`previously build` regenerates browsable Markdown from the event log;
+`previously check` lists memories whose files changed since. Set
+`PREVIOUSLY_AUTOSAVE=0` to keep recaps but stop cliffhanger drafts.
 
 ## Uninstall
 
