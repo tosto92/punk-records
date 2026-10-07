@@ -29,7 +29,9 @@ flowchart LR
 | **recap** | memories injected automatically when a prompt matches |
 | **spoiler** | a saved memory: the fix, the decision, the attempt that failed |
 | **cliffhanger** | the draft saved automatically at the end of a turn, listing the files the session edited |
-| **episodes** | your past Claude Code and Codex sessions, and how to resume them |
+| **episodes** | your past Claude Code and Codex sessions, browsable with `previously episodes` |
+| **series** | a project, as the episodes page groups your sessions |
+| **to be continued…** | the command that resumes an episode where you left off |
 
 ## What the agent sees
 
