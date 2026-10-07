@@ -70,10 +70,11 @@
   dialog::backdrop { background: rgb(14 16 18 / .55); }
   .dh { position: sticky; top: 0; background: var(--panel); padding: 16px 20px 14px; border-bottom: 1px solid var(--border); }
   .dh h3 { margin: 0 0 2px; font-size: 16px; }
-  .tbc { margin: 14px 0 6px; font: italic 400 15px/1 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; }
+  .tbc, .plist { margin: 14px 0 6px; font: italic 400 15px/1 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; }
   .cmd { display: flex; gap: 8px; }
   .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 6px 10px; border-radius: 8px;
               background: var(--panel2); border: 1px solid var(--border); font: 12.5px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  .plist { margin: 0; padding: 14px 20px 4px; }
   .prompt { padding: 10px 20px; border-bottom: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
   .prompt .time { display: block; }
 
@@ -159,6 +160,7 @@ async function openSession(id) {
       <div class="tbc">To be continued<span class="cue">…</span></div>
       <div class="cmd"><code>${esc(s.resume)}</code><button id="copy">Copy</button><button id="close">Close</button></div>
     </div>
+    <h4 class="plist">Prompts</h4>
     ${prompts.map(p => `<div class="prompt"><span class="time">${when(p.ts)}</span>${esc(p.text)}</div>`).join("")}`;
   $("#copy").onclick = async e => { await navigator.clipboard.writeText(s.resume); e.target.textContent = "Copied"; };
   $("#close").onclick = () => $("#dlg").close();
