@@ -6,8 +6,10 @@ description: Save and recall reusable session knowledge with Previously on local
 # Previously on localhost
 
 Cross-session memory for coding agents. Two habits: **recall first**, **save what generalizes**.
+The user may use the TV-show names: a *recap* is the recall injected before a turn,
+a *spoiler* is a saved memory, a *cliffhanger* is an automatic draft.
 
-## Recall (do this first)
+## Recall (the recap; do this first)
 
 When you face an error, unfamiliar subsystem, or a "have we seen this" moment,
 search before exploring from scratch:
@@ -26,7 +28,7 @@ Each hit shows solution + `covers: file:line` hints (best-effort, may be stale).
 Session auto-recall may already inject top hits — still run `previously ask` yourself
 when the injected hits miss.
 
-## Save (when it generalizes)
+## Save a spoiler (when it generalizes)
 
 Save when the session produced something a future session would reuse:
 
@@ -67,7 +69,7 @@ preferences valid in every repo. MCP equivalent: `memory_save({...})`.
 To update instead of creating a memory, pass `--ref <slug|memoryId>` and leave out
 `--title`/`--type`: omitted fields are inherited from the target.
 
-## Drafts
+## Drafts (cliffhangers)
 
 Every agent session auto-saves one draft (`tags: [auto]`, `outcome: open`) listing
 the files it wrote, titled `<Agent> session <id>` where Agent is `OpenCode`,

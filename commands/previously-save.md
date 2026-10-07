@@ -38,7 +38,7 @@ Omitted fields are inherited from the target, so adding a solution later is enou
 previously save --ref <slug> --type solved --solution "<what worked>" --outcome ok
 ```
 
-## Promote an automatic draft
+## Promote an automatic draft (a cliffhanger)
 
 Idle sessions leave a draft titled `<Agent> session <id>` with `tags: auto` and
 `outcome: open` (Agent: OpenCode, Claude Code or Codex). The ref is the draft's slug—`previously ask` prints it—formed by lowercasing and replacing non-alphanumerics with `-`. Promote it instead of writing a new memory:
