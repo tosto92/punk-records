@@ -28,6 +28,7 @@
   .wordmark { font: italic 400 21px/1 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
               letter-spacing: -.01em; white-space: nowrap; }
   .wordmark .cue, .tbc .cue { color: var(--cue); }
+  a.wordmark { color: inherit; text-decoration: none; }
   .brand .page { color: var(--muted); font-size: 13px; }
   input, select, button { font: inherit; font-size: 13px; color: var(--ink); background: var(--panel2);
                           border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
@@ -88,7 +89,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="wordmark">Previously on localhost<span class="cue">…</span></span><span class="page">Episodes</span></div>
+  <div class="brand"><a class="wordmark" href="/" id="home" title="Show all series">Previously on localhost<span class="cue">…</span></a><span class="page">Episodes</span></div>
   <input id="q" type="search" placeholder="Filter by project, title, branch or prompt" aria-label="Filter episodes">
   <select id="days" aria-label="Period">
     <option value="1">Today</option><option value="3">Last 3 days</option>
@@ -110,20 +111,29 @@ const when = ts => t(ts, {month: "short", day: "numeric", hour: "2-digit", minut
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const cut = (s, n = 110) => { s = String(s || "").replace(/\s+/g, " "); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
 
+// The selected series is separate from the text filter: the filter narrows the
+// list of series, the selection only narrows the timeline.
+let sel = "";
+
 async function load() {
   const q = $("#q").value, days = $("#days").value;
-  try { localStorage.setItem("previously-episodes", JSON.stringify({q, days})); } catch {}
+  try { localStorage.setItem("previously-episodes", JSON.stringify({days})); } catch {}
   const d = await (await fetch(`/api/data?q=${encodeURIComponent(q)}&days=${days}`)).json();
+  if (sel && !d.projects.some(p => p.project === sel)) sel = "";
 
-  $("#projects").innerHTML = d.projects.map(p => `
-    <button class="proj ${q === p.project ? "on" : ""}" data-p="${esc(p.project)}" title="${esc(p.project)}">
+  $("#projects").innerHTML = `
+    <button class="proj ${sel ? "" : "on"}" data-p="">
+      <b>All series</b>
+      <span class="muted">${d.projects.length} series</span>
+    </button>` + d.projects.map(p => `
+    <button class="proj ${sel === p.project ? "on" : ""}" data-p="${esc(p.project)}" title="${esc(p.project)}">
       <b>${esc(home(p.project))}</b>
       <span class="muted">${esc(cut(p.last.title || p.last.first, 60))}</span>
       <span class="muted">${when(p.last_ts)}, ${plural(p.ns, "episode")}</span>
     </button>`).join("");
 
   const byDay = {};
-  for (const r of d.timeline) ((byDay[r.day] ??= {})[r.project] ??= []).push(r);
+  for (const r of d.timeline) if (!sel || r.project === sel) ((byDay[r.day] ??= {})[r.project] ??= []).push(r);
   $("#tl").innerHTML = Object.entries(byDay).map(([day, projs]) => `
     <h2 class="day">${t(new Date(day).getTime() / 1000 + 43200, {weekday: "long", day: "numeric", month: "long"})}</h2>
     ${Object.entries(projs).map(([p, ss]) => `
@@ -156,12 +166,13 @@ async function openSession(id) {
   $("#dlg .prompt:last-child")?.scrollIntoView();
 }
 
-$("#projects").onclick = e => { const p = e.target.closest(".proj"); if (p) { $("#q").value = $("#q").value === p.dataset.p ? "" : p.dataset.p; load(); } };
+$("#projects").onclick = e => { const p = e.target.closest(".proj"); if (p) { sel = p.dataset.p === sel ? "" : p.dataset.p; load(); } };
+$("#home").onclick = e => { e.preventDefault(); sel = ""; $("#q").value = ""; load(); };
 $("#tl").onclick = e => { const s = e.target.closest(".sess"); if (s) openSession(s.dataset.id); };
 $("#dlg").onclick = e => { if (e.target === $("#dlg")) $("#dlg").close(); };
 let timer; $("#q").oninput = () => { clearTimeout(timer); timer = setTimeout(load, 250); };
 $("#days").onchange = load;
-try { const s = JSON.parse(localStorage.getItem("previously-episodes")); if (s) { $("#q").value = s.q || ""; $("#days").value = s.days || 7; } } catch {}
+try { const s = JSON.parse(localStorage.getItem("previously-episodes")); if (s) $("#days").value = s.days || 7; } catch {}
 load();
 setInterval(() => document.hidden || $("#dlg").open || load(), 60000);
 </script>
