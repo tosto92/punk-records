@@ -20,7 +20,7 @@ If `previously` is not on PATH, use `node <absolute path to bin/previously> epis
 | Timeline day → project → episodes | `previously episodes timeline [filter] -d 7` |
 | Per project: where the user left off | `previously episodes projects [filter]` |
 | Every prompt of one episode | `previously episodes show <id-or-8-char-prefix>` |
-| Web UI (the user runs it) | `previously episodes serve` → http://127.0.0.1:8787 |
+| Web UI (the user runs it) | `previously serve` → http://127.0.0.1:4400/episodes |
 
 `filter` is a case-insensitive substring matched on project path, title,
 branch, and first/last prompt.

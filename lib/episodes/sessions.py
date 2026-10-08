@@ -6,7 +6,7 @@ usage:
   previously episodes timeline [filter] [-d D]   day -> project -> episodes, last D days (default 7)
   previously episodes projects [filter]          one line per project: where you left off
   previously episodes show <id-prefix>           every prompt of one episode
-  previously episodes serve [port]               web UI on http://127.0.0.1:8787
+  previously episodes serve [port]               web UI (memories + episodes) on http://127.0.0.1:4400/episodes
   sqlite3 ~/.local/share/previously/episodes.db  ad-hoc queries (tables: sessions, prompts; view: v)
 
 Every run syncs incrementally from ~/.claude and ~/.codex first (CLAUDE_CONFIG_DIR
@@ -214,43 +214,20 @@ def open_db():
     return db
 
 
-def serve(port):
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-    from urllib.parse import parse_qs, urlparse
-
-    html = (Path(__file__).resolve().parent / "sessions.html").read_bytes()
-
-    class H_(BaseHTTPRequestHandler):
-        def do_GET(self):
-            u = urlparse(self.path)
-            q = {k: v[0] for k, v in parse_qs(u.query).items()}
-            if u.path == "/":
-                return self.send(html, "text/html; charset=utf-8")
-            db = open_db()
-            if u.path == "/api/data":
-                flt, days = q.get("q", ""), int(q.get("days", 7))
-                tl = [dict(r) | {"resume": resume(r)} for r in timeline_rows(db, flt, days)]
-                pr = [p | {"resume": resume(p["last"])} for p in project_rows(db, flt)]
-                body = {"timeline": tl, "projects": pr}
-            elif u.path == "/api/session":
-                s, ps = session_prompts(db, q.get("id", ""))
-                body = {"session": dict(s) | {"resume": resume(s)}, "prompts": [dict(p) for p in ps]} if s else {}
-            else:
-                return self.send(b"not found", "text/plain", 404)
-            self.send(json.dumps(body).encode(), "application/json")
-
-        def send(self, data, ctype, code=200):
-            self.send_response(code)
-            self.send_header("Content-Type", ctype)
-            self.end_headers()
-            self.wfile.write(data)
-
-        def log_message(self, *a):
-            pass
-
-    # note: bound to localhost only, no auth; the DB holds every prompt you typed
-    print(f"http://127.0.0.1:{port}")
-    ThreadingHTTPServer(("127.0.0.1", port), H_).serve_forever()
+def api(path, query):
+    """JSON for the web UI (served by `previously graph --serve` at /episodes)."""
+    from urllib.parse import parse_qs
+    q = {k: v[0] for k, v in parse_qs(query).items()}
+    db = open_db()
+    if path == "/api/data":
+        flt, days = q.get("q", ""), int(q.get("days", 7))
+        tl = [dict(r) | {"resume": resume(r)} for r in timeline_rows(db, flt, days)]
+        pr = [p | {"resume": resume(p["last"])} for p in project_rows(db, flt)]
+        return {"timeline": tl, "projects": pr}
+    if path == "/api/session":
+        s, ps = session_prompts(db, q.get("id", ""))
+        return {"session": dict(s) | {"resume": resume(s)}, "prompts": [dict(p) for p in ps]} if s else {}
+    sys.exit(f"unknown api path: {path}")
 
 
 def main(argv):
@@ -265,11 +242,11 @@ def main(argv):
         return v
 
     n, days = opt("-n", 20), opt("-d", 7)
-    cmd = argv.pop(0) if argv and argv[0] in ("timeline", "projects", "show", "serve") else "recent"
+    if argv[:1] == ["api"]:
+        return print(json.dumps(api(argv[1], argv[2] if len(argv) > 2 else "")))
+    cmd = argv.pop(0) if argv and argv[0] in ("timeline", "projects", "show") else "recent"
     flt = argv[0] if argv else ""
 
-    if cmd == "serve":
-        return serve(int(flt or 8787))
     db = open_db()
     if cmd == "timeline":
         cmd_timeline(db, flt, days)

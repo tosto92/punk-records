@@ -34,6 +34,10 @@ test('episodes indexes a Claude Code session and shows its prompts', {skip: !has
   assert.equal(show.status, 0, show.stderr);
   assert.match(show.stdout, /fix the zebra login bug/);
   assert.match(run(['--help']).stdout, /previously episodes timeline/);
+
+  const api = JSON.parse(run(['api', '/api/session', `id=${sid.slice(0, 8)}`]).stdout);
+  assert.equal(api.session.title, 'Zebra login');
+  assert.match(JSON.parse(run(['api', '/api/data', 'q=zebra']).stdout).projects[0].project, /\/p\/demo/);
 });
 
 test('episodes without Python says so instead of crashing', () => {

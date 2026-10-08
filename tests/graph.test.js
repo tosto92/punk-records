@@ -144,6 +144,7 @@ test('interactive viewer is self-contained: serves its bundle and the memories a
     assert.match(graph.nodes[0].id, /^alpha/);
     assert.equal(graph.nodes[0].sources[0], 'a.js');
     assert.equal((await fetch(server.url + '/api/code-graph')).status, 404);
+    assert.match(await (await fetch(server.url + '/episodes')).text(), /<a href="\/episodes" aria-current="page">Episodes<\/a>/);
   } finally {
     await server.close();
   }

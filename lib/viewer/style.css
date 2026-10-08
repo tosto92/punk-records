@@ -48,6 +48,7 @@ button:focus-visible,input:focus-visible,.tree-row:focus-visible{outline:2px sol
 
 .appbar{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex:none}
 .brand{display:flex;align-items:baseline;gap:8px;flex:none}
+.switch{display:inline-flex;align-self:center;background:var(--chip);border-radius:9px;padding:3px;gap:2px}.switch a{color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;padding:5px 14px;border-radius:7px}.switch a:hover{color:var(--ink)}.switch a[aria-current]{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .brand b{font-weight:700;letter-spacing:-.01em}
 .brand .wordmark{color:var(--ink);font:italic 400 21px/1 "Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;letter-spacing:-.01em;white-space:nowrap}
 .brand .wordmark .cue{color:var(--cue);font:inherit}

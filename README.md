@@ -113,7 +113,7 @@ After you promote a draft, later automatic captures from that session leave the 
 previously init                   # optional, in a repo: commit agent config for your team
 previously ask "<symptoms, errors or file names>"
 previously save --type solved --title "…" --symptoms "…" --solution "…" --files src/a.ts
-previously graph --serve --open   # browse memories in a local web viewer
+previously serve --open           # web UI: memories + episodes (= graph --serve)
 previously --help
 ```
 
@@ -133,7 +133,7 @@ previously episodes                 # recent sessions, each with its resume comm
 previously episodes projects        # per project: where you left off
 previously episodes timeline -d 7   # day → project → sessions
 previously episodes show 0b5e1d2c   # every prompt of one session
-previously episodes serve           # the same in a local web page
+previously episodes serve           # the same in the web viewer (/episodes, next to memories)
 ```
 
 A read-only SQLite index of `~/.claude` and `~/.codex` (or `CLAUDE_CONFIG_DIR` /

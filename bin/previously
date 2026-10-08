@@ -158,6 +158,8 @@ usage: previously <command> [flags]
   save --type <solved|attempt_failed|decision|note> --title <s> [--symptoms s] [--solution s]
        [--attempt a]... [--files f]... [--tags a,b] [--ref slug] [--global|--local]
                      save a spoiler (or update one with --ref)
+  serve [--open] [--port n] [--scope ...]
+                     web UI: memories (/) and episodes (/episodes); same flags as graph
   graph [--serve] [--open] [--port n] [--scope local|global|all] [--all-projects] [--no-drafts] [--out file]
                      browse memories in a local web viewer
   build              regenerate the derived Markdown index
@@ -178,7 +180,10 @@ if (major < 20 || (major === 20 && minor < 11)) {
   process.exit(2);
 }
 
-const [sub, ...rest] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+// `serve` = the web UI (memories + episodes), i.e. `graph --serve`
+if (argv[0] === "serve") argv.splice(0, 1, "graph", "--serve");
+const [sub, ...rest] = argv;
 switch (sub) {
   case "-h":
   case "--help":
@@ -329,6 +334,18 @@ switch (sub) {
     break;
   }
   case "episodes": {
+    // ponytail: one web UI; the episodes page lives on the graph server
+    if (rest[0] === "serve") {
+      const port = Number(rest[1] ?? 4400);
+      if (!Number.isInteger(port) || port < 0 || port > 65535) {
+        console.error(`previously: invalid port: ${rest[1]}`);
+        process.exit(2);
+      }
+      const {url, close} = await serveGraph(resolveScopes({explicit: null}), {scope: "all", port});
+      console.log(`${url}/episodes`);
+      for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => close().then(() => process.exit(0)));
+      break;
+    }
     const script = fileURLToPath(new URL("../lib/episodes/sessions.py", import.meta.url));
     const python = process.env.PREVIOUSLY_PYTHON || "python3";
     const res = spawnSync(python, [script, ...rest], { stdio: "inherit" });
