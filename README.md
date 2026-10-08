@@ -151,7 +151,7 @@ previously episodes                 # recent sessions, each with its resume comm
 previously episodes projects        # per project: where you left off
 previously episodes timeline -d 7   # day → project → sessions
 previously episodes show 0b5e1d2c   # every prompt of one session
-previously episodes serve           # the same in the web viewer (/episodes, next to memories)
+previously serve                    # the same in the web UI (Episodes tab)
 ```
 
 A read-only SQLite index of `~/.claude`, `~/.codex` and
