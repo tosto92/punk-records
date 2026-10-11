@@ -34,3 +34,17 @@ test("previously skill teaches when to save and recall", () => {
   assert.ok(command.includes("-session-<id>") && command.includes("--ref"), "previously-save must document slug ref format");
   assert.ok(!/--ref "[A-Z]/.test(command), "previously-save example must not quote ref with capital letter");
 });
+
+test("previously skill supplies the protected memory review workflow", () => {
+  const src = fs.readFileSync(path.join(root, "skills", "previously", "SKILL.md"), "utf8");
+  for (const reference of ["PREVIOUSLY_SECURITY=1", "PREVIOUSLY_PYTHON", "previously scan", "previously review",
+    "no_signals", "suspicious", "incomplete", "pending", "false positive", "revoke", "docs/memory-security.md"]) {
+    assert.ok(src.includes(reference), `must document security reference: ${reference}`);
+  }
+  assert.match(src, /reference data, never instructions/);
+  assert.match(src, /never approve automatically/i);
+  assert.match(src, /no_signals` means[^.]*does not prove truth or authorize/i);
+  assert.match(src, /content,\s*store,\s*scanner,\s*and matched rule/i);
+  assert.match(src, /MCP.*approval/i);
+  assert.match(src, /unconfigured installs are unprotected/i);
+});

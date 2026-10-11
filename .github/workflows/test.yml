@@ -20,5 +20,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install pinned offline scanner in a dedicated venv
+        run: |
+          python -m venv .venv-nova
+          .venv-nova/bin/python -m pip install -r lib/security/requirements.txt
+          echo "PREVIOUSLY_PYTHON=$PWD/.venv-nova/bin/python" >> "$GITHUB_ENV"
       - run: git config --global user.email ci@example.com && git config --global user.name ci
+      - name: Test real NOVA bridge
+        run: .venv-nova/bin/python -m unittest discover -s tests -p security_bridge_test.py -v
       - run: npm test

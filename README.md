@@ -11,7 +11,7 @@ Session memory for coding agents. Before each turn the agent gets a **recap**
 of what past sessions learned in this project, the way a TV show opens with
 "previously on…". Works with **Claude Code**, **Codex** and **OpenCode**.
 
-- Node only, zero dependencies, no LLM calls, no API key.
+- Core memory runs on Node with zero npm dependencies, no LLM calls, no API key.
 - Everything stays on your machine: no network access, no telemetry.
 - Plain files: an append-only `events.jsonl` you can read, grep and commit.
 
@@ -52,6 +52,8 @@ covers: src/auth/session.ts
 ## Install
 
 Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for `episodes`.
+Optional memory protection requires Python 3.10+ and pinned NOVA in a dedicated
+venv; it makes no model or provider calls.
 
 ### As a plugin (Claude Code, Codex)
 
@@ -125,6 +127,22 @@ exploring and to save what generalizes. Memory types: `solved`,
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/memories-dark.png">
   <img alt="The memory viewer: memories as a graph linked by shared tags and files, with the selected spoiler on the right" src="docs/images/memories-light.png">
 </picture>
+
+## Memory protection (opt-in)
+
+Unconfigured installs are unprotected. [Set up pinned NOVA and review detected
+memories](docs/memory-security.md), then explicitly launch each agent with
+`PREVIOUSLY_SECURITY=1` and `PREVIOUSLY_PYTHON=/absolute/venv/bin/python`.
+Protected recall excludes suspicious pending memories and incomplete scans;
+committed saves remain saved even when scanning fails.
+
+`previously scan --local` (or `--global`) reports `no_signals`, `suspicious`, or
+`incomplete`; exit codes are 0, 1, and 2 respectively, with errors/incompleteness
+taking precedence over detections. The human uses `previously review` in a real
+terminal to approve an exact false positive or revoke it. Agents never approve
+automatically. Saving, rebuilding, and `outcome: ok` are not approval; absence of
+signals is neither proof of truth nor permission to act. Direct Markdown reads
+bypass the gate, and the local review ledger cannot authenticate same-user writes.
 
 ## Episodes
 
@@ -205,7 +223,11 @@ Claude Code, Codex and OpenCode releases.
 ## Development
 
 ```sh
-npm test                      # node --test; live agent smoke tests run only with CLAUDE_BIN / CODEX_BIN set
+python3.10 -m venv .venv-nova
+.venv-nova/bin/python -m pip install -r lib/security/requirements.txt
+export PREVIOUSLY_PYTHON="$PWD/.venv-nova/bin/python"
+.venv-nova/bin/python -m unittest discover -s tests -p security_bridge_test.py -v
+npm test                      # real NOVA tests are mandatory; live smoke tests require explicit *_BIN opt-ins
 node scripts/screenshots.mjs  # regenerate docs/images from made-up demo data (needs playwright)
 ```
 
