@@ -1,7 +1,10 @@
 import hashlib
+from contextlib import ExitStack, contextmanager, redirect_stderr
 from functools import cache
 import importlib.util
+import io
 import json
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -9,6 +12,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from nova.core.matcher import logger as nova_logger
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE = ROOT / 'lib/security/scan.py'
@@ -58,6 +62,24 @@ def load_bridge():
     return bridge
 
 
+@contextmanager
+def expected_nova_stderr(*expected):
+    output = io.StringIO()
+    try:
+        with redirect_stderr(output), ExitStack() as stack:
+            # NOVA's existing handlers retain the stderr stream from their first import.
+            for handler in nova_logger.handlers:
+                if isinstance(handler, logging.StreamHandler):
+                    stack.enter_context(patch.object(handler, 'stream', output))
+            yield output
+            assert set(expected).issubset(output.getvalue().splitlines()), 'Missing expected NOVA diagnostics'
+    except AssertionError as error:
+        raise AssertionError(f'{error}\nCaptured NOVA stderr:\n{output.getvalue()}') from error
+    finally:
+        sys.stderr.write(''.join(line for line in output.getvalue().splitlines(keepends=True)
+                                 if line.rstrip('\n') not in expected))
+
+
 def invoke(payload, env=None):
     if env is None:
         response = load_bridge().scan_batch(payload)
@@ -78,6 +100,34 @@ def run_bridge(fixture, rules=None):
 
 
 class BridgeTests(unittest.TestCase):
+    def test_expected_nova_stderr_is_quiet_on_success(self):
+        output = io.StringIO()
+        with redirect_stderr(output):
+            self.test_missing_llm_negated_and_irrelevant_stage()
+        self.assertEqual(output.getvalue(), '')
+
+    def test_expected_nova_stderr_keeps_unexpected_messages_and_failure_evidence(self):
+        expected = '[WARNING] known fixture warning'
+        unexpected = '[WARNING] unexpected warning\n[ERROR] unexpected error\n'
+        output = io.StringIO()
+        with redirect_stderr(output):
+            with expected_nova_stderr(expected):
+                sys.stderr.write(expected + '\n')
+                nova_logger.warning('unexpected warning')
+                nova_logger.error('unexpected error')
+        self.assertEqual(output.getvalue(), unexpected)
+        output = io.StringIO()
+        with redirect_stderr(output), self.assertRaises(AssertionError) as failure:
+            with expected_nova_stderr(expected):
+                sys.stderr.write(expected + '\n' + unexpected)
+                raise AssertionError('fixture assertion failed')
+        self.assertIn('fixture assertion failed', str(failure.exception))
+        self.assertIn('Captured NOVA stderr:\n' + expected + '\n' + unexpected, str(failure.exception))
+        self.assertEqual(output.getvalue(), unexpected)
+        with self.assertRaisesRegex(AssertionError, 'Missing expected NOVA diagnostics'):
+            with expected_nova_stderr(expected):
+                pass
+
     def test_bridge_entrypoint_exists(self):
         self.assertTrue(BRIDGE.is_file(), 'Task 1 bridge is absent')
 
@@ -113,6 +163,9 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(match['ruleId'], match['ruleName'])
         self.assertTrue(match['patternIds'])
 
+    @expected_nova_stderr(
+        '[ERROR] Error evaluating llm.$model: llm_unavailable',
+        "[WARNING] Rule 'NegatedLLM' failed closed because llm.$model evaluation errored: llm_unavailable")
     def test_missing_llm_negated_and_irrelevant_stage(self):
         self.assertEqual(run_bridge('missing_llm_negated', 'conditions.nov')['results'][0]['status'], 'incomplete')
         self.assertEqual(run_bridge('irrelevant_missing_stage', 'conditions.nov')['results'][0]['incompleteRules'], [])
@@ -144,18 +197,27 @@ class BridgeTests(unittest.TestCase):
             ('all of semantics.*', semantic, 'gamma', 'incomplete'),
             ('1 of llm.*', llm, 'gamma', 'incomplete'),
         ]
-        for condition, stages, text, expected in cases:
-            with self.subTest(condition=condition, text=text):
-                result = invoke(request([{'field': 'solution', 'text': text}], [('test.nov', rule(condition, stages=stages))]))['results'][0]
-                self.assertEqual(result['status'], expected)
-                self.assertEqual(bool(result['incompleteRules']), expected == 'incomplete')
+        with expected_nova_stderr(
+            "[!] Warning: Rule 'Example' has 1 unused variables: $b",
+            "[!] Warning: Rule 'Example' has 2 unused variables: $a, $b",
+            '[ERROR] Error evaluating llm.$l: llm_unavailable',
+            "[WARNING] Rule 'Example' failed closed because llm.$l evaluation errored: llm_unavailable",
+            '[ERROR] Error evaluating semantics.$s: semantic_unavailable',
+            "[WARNING] Rule 'Example' failed closed because semantics.$s evaluation errored: semantic_unavailable") as diagnostics:
+            for condition, stages, text, expected in cases:
+                with self.subTest(condition=condition, text=text):
+                    result = invoke(request([{'field': 'solution', 'text': text}], [('test.nov', rule(condition, stages=stages))]))['results'][0]
+                    self.assertEqual(result['status'], expected, diagnostics.getvalue())
+                    self.assertEqual(bool(result['incompleteRules']), expected == 'incomplete', diagnostics.getvalue())
 
+    @expected_nova_stderr("[!] Warning: Rule 'Example' has 1 unused variables: $b")
     def test_joint_unavailable_stages_cannot_hide_incomplete_analysis(self):
         content = rule('keywords.$a or (semantics.$s and llm.$l)', stages='    semantics:\n        $s = "injection" (0.5)\n    llm:\n        $l = "injection" (0.5)')
         result = run_bridge('joint_missing_stages', [('joint.nov', content)])['results'][0]
         self.assertEqual(result['status'], 'incomplete')
         self.assertEqual(result['incompleteRules'], [{'ruleId':'Example', 'reason':'unavailable_condition'}])
 
+    @expected_nova_stderr("[!] Warning: Rule 'Example' has 2 unused variables: $a, $b")
     def test_joint_unavailable_positive_is_not_a_definite_match(self):
         content = rule('not (semantics.$s and llm.$l)', stages='    semantics:\n        $s = "injection" (0.5)\n    llm:\n        $l = "injection" (0.5)')
         result = run_bridge('joint_missing_stages', [('joint.nov', content)])['results'][0]
@@ -163,6 +225,7 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(result['matches'], [])
         self.assertEqual(result['incompleteRules'], [{'ruleId':'Example', 'reason':'unavailable_condition'}])
 
+    @expected_nova_stderr("[!] Warning: Rule 'Example' has 1 unused variables: $b")
     def test_completeness_probe_is_bounded(self):
         stages = '    semantics:\n'+''.join(f'        $s{i} = "injection" (0.5)\n' for i in range(5))
         stages += '    llm:\n'+''.join(f'        $l{i} = "injection" (0.5)\n' for i in range(4))
@@ -171,6 +234,10 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(result['status'], 'incomplete')
         self.assertEqual(result['incompleteRules'], [{'ruleId':'Example', 'reason':'condition_probe_limit'}])
 
+    @expected_nova_stderr(
+        "[!] Warning: Rule 'Missing' has 2 unused variables: $a, $b",
+        '[ERROR] Error evaluating llm.$l: llm_unavailable',
+        "[WARNING] Rule 'Missing' failed closed because llm.$l evaluation errored: llm_unavailable")
     def test_definite_match_retains_separate_incomplete_evidence(self):
         rules = [('match.nov', rule(name='Match')), ('missing.nov', rule('not llm.$l', 'Missing', '    llm:\n        $l = "injection" (0.5)'))]
         result = invoke(request([{'field': 'solution', 'text': 'alpha'}], rules))['results'][0]
@@ -234,6 +301,9 @@ class BridgeTests(unittest.TestCase):
         payload = request([], []); payload['items'] = []
         self.assertEqual(invoke(payload)['errors'], ['empty_rules'])
 
+    @expected_nova_stderr(
+        '[ERROR] Error evaluating llm.$llm_invisible_prompt: llm_unavailable',
+        "[WARNING] Rule 'DetectInvisibleUnicodeInjection' failed closed because llm.$llm_invisible_prompt evaluation errored: llm_unavailable")
     def test_upstream_bundle_hashes_and_mixed_stage(self):
         manifest = json.loads((RULES / 'manifest.json').read_text())
         self.assertEqual(manifest['upstreamCommit'], '3cee07e073c949bd00a8445a6eb2fd57a03ce1d2')

@@ -130,12 +130,24 @@ test('retrieval honors exact store approval, reports exceptions, revokes and inv
   assert.match(logs[0], /1 reviewed exception/);
   logs.length = 0;
   assert.equal(search({query: 'deploy', scope: 'global', resolved: f.resolved}).length, 1);
-  assert.equal(logs.length, 1); assert.match(logs[0], /0 excluded.*1 reviewed exception/);
+  assert.equal(logs.length, 1); assert.match(logs[0], /0 excluded \(0 suspicious, 0 incomplete\).*1 reviewed exception/);
   assert.equal(recordDecision(entries[0], report.results[0], 'exclude').recorded, true);
   assert.deepEqual(search({query: 'deploy', resolved: f.resolved}), []);
   assert.equal(recordDecision(entries[0], report.results[0], 'approve').recorded, true);
   writeSecurityStore(f.home, [{...attack, solution: attack.solution + '; edited'}]);
   assert.deepEqual(search({query: 'deploy', resolved: f.resolved}), []);
+});
+
+test('protected search reports excluded suspicious and incomplete statuses separately', t => {
+  const f = securityFixture(t);
+  const oversized = {...benign, memoryId: 'c'.repeat(40), title: 'deploy oversized', solution: 'x'.repeat(50001)};
+  writeSecurityStore(f.home, [attack, benign, oversized]);
+  const logs = []; t.mock.method(console, 'error', line => logs.push(line));
+  assert.deepEqual(search({query: 'deploy', resolved: f.resolved}).map(h => h.memoryId), [benignId]);
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /2 excluded \(1 suspicious, 1 incomplete\), 0 reviewed exceptions/);
+  assert.ok(logs[0].length < 300);
+  assert.doesNotMatch(logs[0], /quarantined|QUARANTINED|Ignore|oversized|xxxxx/);
 });
 
 test('security disabled preserves search output without invoking an unavailable Python', t => {
@@ -152,7 +164,7 @@ test('unexpected scanner exceptions fail closed with bounded count-only diagnost
   process.env.PREVIOUSLY_PYTHON = 'invalid\0interpreter';
   const logs = []; t.mock.method(console, 'error', line => logs.push(line));
   assert.deepEqual(search({query: 'deploy', resolved: f.resolved}), []);
-  assert.equal(logs.length, 1); assert.match(logs[0], /2 excluded.*previously review/);
+  assert.equal(logs.length, 1); assert.match(logs[0], /2 excluded \(0 suspicious, 2 incomplete\).*previously review/);
   assert.doesNotMatch(logs[0], /invalid|interpreter|quarantined|QUARANTINED/);
 });
 

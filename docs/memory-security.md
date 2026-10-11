@@ -105,9 +105,10 @@ Decisions append to global `security/reviews.jsonl`, under `PREVIOUSLY_HOME` or
 `~/.local/share/previously`. An exception binds the physical store, memory ID,
 hash of all compiled content plus store/scope, scanner engine/protocol/rules hash,
 and sorted matched-rule set. Identical IDs in different stores do not share
-decisions. Symlinked stores resolve to physical identity. The last decision for
-the exact tuple controls. To **revoke**, run review again and choose `x`; a prior
-approval is shown and replaced by an exclusion decision.
+decisions. Accepted paths, including aliases through symlinked ancestors, are
+normalized to physical identity; store-root and source-file symlinks are rejected.
+The last decision for the exact tuple controls. To **revoke**, run review again
+and choose `x`; a prior approval is shown and replaced by an exclusion decision.
 
 Changing compiled content, physical store/scope, engine/protocol identity, active
 rule bytes or names, or matched rules invalidates the exception. Review rescans
