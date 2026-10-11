@@ -1,4 +1,5 @@
 import hashlib
+from functools import cache
 import importlib.util
 import json
 import os
@@ -49,12 +50,23 @@ def request(texts, rules=None):
             'memoryId': 'fixture-memory', 'contentHash': sha(json.dumps(texts)), 'texts': texts}]}
 
 
+@cache
+def load_bridge():
+    spec = importlib.util.spec_from_file_location('security_bridge', BRIDGE)
+    bridge = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(bridge)
+    return bridge
+
+
 def invoke(payload, env=None):
-    process = subprocess.run([sys.executable, str(BRIDGE)], input=json.dumps(payload),
-                             text=True, capture_output=True, env=env, timeout=5)
-    if process.returncode:
-        raise AssertionError(f'Bridge exited {process.returncode}: {process.stderr}')
-    response = json.loads(process.stdout)
+    if env is None:
+        response = load_bridge().scan_batch(payload)
+    else:
+        process = subprocess.run([sys.executable, str(BRIDGE)], input=json.dumps(payload),
+                                 text=True, capture_output=True, env=env, timeout=5)
+        if process.returncode:
+            raise AssertionError(f'Bridge exited {process.returncode}: {process.stderr}')
+        response = json.loads(process.stdout)
     assert set(response) == {'scanner', 'results', 'errors'}, response
     assert len(response['results']) == len(payload['items']), response
     return response
@@ -68,6 +80,15 @@ def run_bridge(fixture, rules=None):
 class BridgeTests(unittest.TestCase):
     def test_bridge_entrypoint_exists(self):
         self.assertTrue(BRIDGE.is_file(), 'Task 1 bridge is absent')
+
+    def test_stdio_benign_and_attack_roundtrip(self):
+        payload = request(MEMORIES['benign_en'])
+        attack = request(MEMORIES['override_en'])['items'][0]
+        attack['memoryId'] = 'fixture-attack'
+        payload['items'].append(attack)
+        response = invoke(payload, dict(os.environ))
+        self.assertEqual([result['status'] for result in response['results']], ['no_signals', 'suspicious'])
+        self.assertTrue(response['results'][1]['matches'])
 
     def test_default_profile(self):
         for name in ('benign_en', 'benign_it'):
@@ -188,9 +209,7 @@ class BridgeTests(unittest.TestCase):
         self.assertEqual(invoke(request(MEMORIES['benign_en'], [('test.nov', content)]))['results'][0]['status'], 'no_signals')
 
     def test_installed_engine_version_is_checked(self):
-        spec = importlib.util.spec_from_file_location('security_bridge', BRIDGE)
-        bridge = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(bridge)
+        bridge = load_bridge()
         payload = request(MEMORIES['benign_en'], [('test.nov', rule())])
         with patch.object(bridge.importlib.metadata, 'version', return_value='0.3.0'):
             self.assertEqual(bridge.scan_batch(payload)['errors'], ['engine_version_mismatch'])
