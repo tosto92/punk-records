@@ -19,7 +19,7 @@ test('episodes indexes a Claude Code session and shows its prompts', {skip: !has
     JSON.stringify({sessionId: sid, timestamp: Date.now(), display: '/clear', project: '/p/demo'}) + '\n');
   fs.writeFileSync(path.join(claude, 'projects', '-p-demo', `${sid}.jsonl`),
     JSON.stringify({aiTitle: 'Zebra login', gitBranch: 'feat', cwd: '/p/demo/.worktrees/feat'}) + '\n');
-  const env = {...process.env, HOME: home, PREVIOUSLY_HOME: path.join(home, 'store'), CLAUDE_CONFIG_DIR: '', CODEX_HOME: ''};
+const env = {...process.env, HOME: home, XDG_DATA_HOME: path.join(home, '.local/share'), PREVIOUSLY_HOME: path.join(home, 'store'), CLAUDE_CONFIG_DIR: '', CODEX_HOME: ''};
   const run = args => spawnSync(process.execPath, [CLI, 'episodes', ...args], {env, encoding: 'utf8'});
 
   const recent = run([]);
@@ -51,13 +51,62 @@ test('resume commands quote paths and session IDs as single shell arguments', {s
 import importlib.util, shlex
 spec = importlib.util.spec_from_file_location('episodes', 'lib/episodes/sessions.py')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-for tool in ('claude', 'codex'):
+for tool in ('claude', 'codex', 'opencode'):
     cwd = "/tmp/my project/it's $HOME; echo unsafe"
     sid = "session id'; echo unsafe"
     r = {'tool': tool, 'cwd': cwd, 'id': sid}
-    assert shlex.split(m.resume(r)) == ['cd', cwd, '&&', tool, '--resume' if tool == 'claude' else 'resume', sid]
+    assert shlex.split(m.resume(r)) == ['cd', cwd, '&&', tool, {'claude': '--resume', 'codex': 'resume', 'opencode': '--session'}[tool], sid]
 `], {cwd: path.dirname(path.dirname(CLI)), encoding: 'utf8'});
   assert.equal(res.status, 0, res.stderr);
+});
+
+test('episodes imports OpenCode user prompts from its database and refreshes changed sessions', {skip: !hasPython && 'python3 not found'}, t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-opencode-'));
+  t.after(() => fs.rmSync(home, {recursive: true, force: true}));
+  const data = path.join(home, 'data');
+  fs.mkdirSync(path.join(data, 'opencode'), {recursive: true});
+  const source = path.join(data, 'opencode', 'opencode.db');
+  const setup = spawnSync('python3', ['-c', `
+import sqlite3, sys, json, time
+d = sqlite3.connect(sys.argv[1]); ts = int(time.time() * 1000)
+d.executescript('''CREATE TABLE session(id TEXT PRIMARY KEY, directory TEXT, title TEXT, time_updated INTEGER);
+CREATE TABLE message(id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, data TEXT);
+CREATE TABLE part(id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, data TEXT);''')
+d.execute('INSERT INTO session VALUES(?,?,?,?)', ('ses_zebra', '/p/demo/.worktrees/fix', 'OpenCode zebra', ts))
+for mid, role, parts in [('user', 'user', [{'type':'text','text':'fix zebra'}, {'type':'text','text':'login'}, {'type':'text','text':'hidden','synthetic':True}, {'type':'file','url':'private'}]), ('assistant', 'assistant', [{'type':'text','text':'assistant answer'}])]:
+    d.execute('INSERT INTO message VALUES(?,?,?,?)', (mid, 'ses_zebra', ts, json.dumps({'role':role})))
+    for i, part in enumerate(parts):
+        d.execute('INSERT INTO part VALUES(?,?,?,?)', (mid + str(i), mid, 'ses_zebra', json.dumps(part)))
+d.commit()
+` , source], {encoding: 'utf8'});
+  assert.equal(setup.status, 0, setup.stderr);
+  const env = {...process.env, HOME: home, XDG_DATA_HOME: data, PREVIOUSLY_HOME: path.join(home, 'store'), CLAUDE_CONFIG_DIR: '', CODEX_HOME: ''};
+  const run = args => {
+    const res = spawnSync(process.execPath, [CLI, 'episodes', ...args], {env, encoding: 'utf8'});
+    assert.equal(res.status, 0, res.stderr);
+    return res.stdout;
+  };
+  const first = JSON.parse(run(['api', '/api/session', 'id=ses_zebra']));
+  assert.equal(first.session?.tool, 'opencode');
+  assert.equal(first.session.project, '/p/demo');
+  assert.equal(first.session.title, 'OpenCode zebra');
+  assert.equal(first.session.resume, 'cd /p/demo/.worktrees/fix && opencode --session ses_zebra');
+  assert.deepEqual(first.prompts.map(p => p.text), ['fix zebra\nlogin']);
+  assert.equal(JSON.parse(run(['api', '/api/session', 'id=ses_zebra'])).prompts.length, 1);
+  const update = spawnSync('python3', ['-c', `
+import sqlite3, sys, json
+d = sqlite3.connect(sys.argv[1])
+d.execute("UPDATE session SET title='Updated zebra', time_updated=time_updated+1000")
+d.execute("INSERT INTO message SELECT 'next', id, time_updated, ? FROM session", (json.dumps({'role':'user'}),))
+d.execute("INSERT INTO part VALUES('next', 'next', 'ses_zebra', ?)", (json.dumps({'type':'text','text':'follow up'}),))
+d.commit()
+`, source], {encoding: 'utf8'});
+  assert.equal(update.status, 0, update.stderr);
+  const updated = JSON.parse(run(['api', '/api/session', 'id=ses_zebra']));
+  assert.equal(updated.session.title, 'Updated zebra');
+  assert.deepEqual(updated.prompts.map(p => p.text), ['fix zebra\nlogin', 'follow up']);
+  fs.renameSync(source, source + '.removed');
+  assert.equal(JSON.parse(run(['api', '/api/session', 'id=ses_zebra'])).prompts.length, 2);
 });
 
 test('episode searches find intermediate prompts consistently without duplicate sessions', {skip: !hasPython && 'python3 not found'}, () => {

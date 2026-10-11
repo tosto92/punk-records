@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Episodes: SQLite index of past Claude Code + Codex sessions across all projects.
+"""Episodes: SQLite index of past Claude Code, Codex + OpenCode sessions across all projects.
 
 usage:
   previously episodes [filter] [-n N]            recent episodes with resume command
@@ -9,8 +9,9 @@ usage:
   previously episodes serve [port]               web UI (memories + episodes) on http://127.0.0.1:4400/episodes
   sqlite3 ~/.local/share/previously/episodes.db  ad-hoc queries (tables: sessions, prompts; view: v)
 
-Every run syncs incrementally from ~/.claude and ~/.codex first (CLAUDE_CONFIG_DIR
-and CODEX_HOME are honoured). Read-only: agent files are never modified.
+Every run syncs incrementally from ~/.claude, ~/.codex and OpenCode's opencode.db
+first (CLAUDE_CONFIG_DIR, CODEX_HOME and XDG_DATA_HOME are honoured).
+Read-only: agent files are never modified.
 """
 import glob, json, os, re, shlex, sqlite3, sys, time
 from collections import defaultdict
@@ -19,6 +20,7 @@ from pathlib import Path
 H = Path.home()
 CLAUDE = Path(os.environ.get("CLAUDE_CONFIG_DIR") or H / ".claude")
 CODEX = Path(os.environ.get("CODEX_HOME") or H / ".codex")
+OPENCODE = Path(os.environ.get("XDG_DATA_HOME") or H / ".local/share") / "opencode/opencode.db"
 DB = Path(os.environ.get("PREVIOUSLY_HOME") or H / ".local/share/previously") / "episodes.db"
 
 SCHEMA = """
@@ -73,6 +75,8 @@ def sync(db):
     codex_titles = {d["id"]: d.get("thread_name") for d in jsonl(CODEX / "session_index.jsonl") if "id" in d}
 
     for sid, tool, cwd, mtime, proj in db.execute("SELECT id, tool, cwd, file_mtime, project FROM sessions").fetchall():
+        if tool == "opencode":
+            continue
         f = files.get(sid)
         m = os.path.getmtime(f) if f else None
         # Unchanged file, or file gone (Claude deletes transcripts after ~30 days): keep what we have.
@@ -94,7 +98,38 @@ def sync(db):
             "UPDATE sessions SET cwd=?, project=?, branch=?, title=?, file=?, file_mtime=? WHERE id=?",
             (cwd, project_of(cwd), branch, title, f, m, sid),
         )
+    sync_opencode(db)
     db.commit()
+
+
+def sync_opencode(db):
+    if not OPENCODE.is_file():
+        return
+    source = sqlite3.connect(OPENCODE.resolve().as_uri() + "?mode=ro", uri=True)
+    try:
+        known = dict(db.execute("SELECT id, file_mtime FROM sessions WHERE tool='opencode'"))
+        for sid, cwd, title, updated in source.execute("SELECT id, directory, title, time_updated FROM session"):
+            if known.get(sid) == updated:
+                continue
+            db.execute("""INSERT INTO sessions(id,tool,cwd,project,title,file,file_mtime) VALUES(?,?,?,?,?,?,?)
+                       ON CONFLICT(id) DO UPDATE SET cwd=excluded.cwd, project=excluded.project,
+                       title=excluded.title, file=excluded.file, file_mtime=excluded.file_mtime""",
+                       (sid, "opencode", cwd, project_of(cwd), title, str(OPENCODE), updated))
+            prompts = defaultdict(list)
+            for mid, ts, message, part in source.execute("""SELECT m.id, m.time_created, m.data, p.data
+                    FROM message m JOIN part p ON p.message_id=m.id
+                    WHERE m.session_id=? ORDER BY m.time_created, p.id""", (sid,)):
+                message, part = json.loads(message), json.loads(part)
+                if message.get("role") != "user" or part.get("type") != "text" or part.get("synthetic") or part.get("ignored"):
+                    continue
+                text = (part.get("text") or "").strip()
+                if text and not text.startswith("/"):
+                    prompts[(mid, ts)].append(text)
+            db.execute("DELETE FROM prompts WHERE session_id=?", (sid,))
+            db.executemany("INSERT OR IGNORE INTO prompts VALUES(?,?,?)",
+                           ((sid, ts / 1000, "\n".join(parts)) for (_, ts), parts in prompts.items()))
+    finally:
+        source.close()
 
 
 def one(t, n=90):
@@ -108,7 +143,7 @@ def short(p):
 
 def resume(r):
     sid = shlex.quote(r['id'])
-    cmd = f"claude --resume {sid}" if r["tool"] == "claude" else f"codex resume {sid}"
+    cmd = f"{ {'claude': 'claude --resume', 'codex': 'codex resume', 'opencode': 'opencode --session'}[r['tool']]} {sid}"
     return f"cd {shlex.quote(str(r['cwd']))} && {cmd}"
 
 

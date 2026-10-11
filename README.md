@@ -29,7 +29,7 @@ flowchart LR
 | **recap** | memories injected automatically when a prompt matches |
 | **spoiler** | a saved memory: the fix, the decision, the attempt that failed |
 | **cliffhanger** | the draft saved automatically at the end of a turn, listing the files the session edited |
-| **episodes** | your past Claude Code and Codex sessions, browsable with `previously episodes` |
+| **episodes** | your past Claude Code, Codex and OpenCode sessions, browsable with `previously episodes` |
 | **series** | a project, as the episodes page groups your sessions |
 | **to be continued…** | the command that resumes an episode where you left off |
 
@@ -136,8 +136,10 @@ previously episodes show 0b5e1d2c   # every prompt of one session
 previously episodes serve           # the same in the web viewer (/episodes, next to memories)
 ```
 
-A read-only SQLite index of `~/.claude` and `~/.codex` (or `CLAUDE_CONFIG_DIR` /
-`CODEX_HOME`), synced on every call into `~/.local/share/previously/episodes.db`.
+A read-only SQLite index of `~/.claude`, `~/.codex` and
+`~/.local/share/opencode/opencode.db` (respecting `CLAUDE_CONFIG_DIR`,
+`CODEX_HOME` and `XDG_DATA_HOME`), synced on every call into
+`~/.local/share/previously/episodes.db`.
 Needs Python 3.9+. The `previously-episodes` skill lets the agent answer
 "where was I?" itself.
 

@@ -1,14 +1,14 @@
 ---
 name: previously-episodes
-description: Look up the user's past Claude Code and Codex sessions ("episodes") across all projects - timeline, where they left off per project, the prompts of one session, and the exact resume command. Use when the user asks where they left off, what they worked on (today, yesterday, this week, on project X), to find a past session about a topic, or how to resume one.
+description: Look up the user's past Claude Code, Codex and OpenCode sessions ("episodes") across all projects - timeline, where they left off per project, the prompts of one session, and the exact resume command. Use when the user asks where they left off, what they worked on (today, yesterday, this week, on project X), to find a past session about a topic, or how to resume one.
 ---
 
 # Previously on localhost — episodes
 
-`previously episodes` keeps a SQLite index of every Claude Code and Codex
+`previously episodes` keeps a SQLite index of every Claude Code, Codex and OpenCode
 session: project, branch, title, the prompts the user typed, timestamps. Every
 call syncs incrementally first, so it is always current. It only reads the
-agents' own session files and never modifies them. Output is plain text when piped.
+agents' own session files and OpenCode database and never modifies them. Output is plain text when piped.
 
 If `previously` is not on PATH, use `node <absolute path to bin/previously> episodes`.
 
@@ -54,7 +54,7 @@ WHERE p.text LIKE '%keyword%' ORDER BY p.ts DESC LIMIT 20;
   instead of pasting the raw output.
 - **Find the session where I talked about Y.** Run the full-text SQL above,
   then `previously episodes show` on the best hit.
-- `show` lists only the user's prompts. For the agent's side, the session file
-  is `sessions.file` (JSONL); read only its tail, these files can be large.
+- `show` lists only the user's prompts. For the agent's side, `sessions.file`
+  is a JSONL transcript for Claude/Codex (read only its tail) or OpenCode's SQLite database.
 - Always end with the exact resume command (`cd <cwd> && claude --resume <id>`
-  or `codex resume <id>`).
+  or `codex resume <id>` or `opencode --session <id>`).
