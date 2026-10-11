@@ -1,0 +1,46 @@
+rule PreviouslyInstructionOverride
+{
+    meta:
+        category = "prompt_manipulation/indirect_injection"
+        severity = "high"
+    keywords:
+        $english = /\b(ignore|disregard|override)\s+(all\s+)?(previous|prior|system)\s+instructions\b/i
+        $italian = /\b(ignora|ignorare|dimentica)\s+(tutte\s+)?(le\s+)?istruzioni\s+(precedenti|di\s+sistema)\b/i
+    condition:
+        any of keywords.*
+}
+
+rule PreviouslyForgedRole
+{
+    meta:
+        category = "prompt_manipulation/indirect_injection"
+        severity = "high"
+    keywords:
+        $close = "</previously>"
+        $system = /<system>|\[SYSTEM\]|^\s*SYSTEM:\s*/i
+    condition:
+        any of keywords.*
+}
+
+rule PreviouslyBlanketApproval
+{
+    meta:
+        category = "prompt_manipulation/indirect_injection"
+        severity = "high"
+    keywords:
+        $english = /\b(user|human)\s+(has\s+)?(already\s+)?approved\s+(all|any)\s+(future\s+)?(tool\s+)?(actions|commands|operations)\b/i
+        $italian = /\b(utente|umano)\s+ha\s+(già\s+)?(approvato|autorizzato)\s+tutte\s+le\s+(future\s+)?(azioni|operazioni|esecuzioni)\b/i
+    condition:
+        any of keywords.*
+}
+
+rule PreviouslyHiddenUnicode
+{
+    meta:
+        category = "suspicious_patterns/unicode_tricks"
+        severity = "high"
+    keywords:
+        $hidden = /[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u00AD\u034F\u180E\U000E0000-\U000E007F]/
+    condition:
+        keywords.$hidden
+}

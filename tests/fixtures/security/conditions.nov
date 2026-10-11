@@ -1,0 +1,9 @@
+rule NegatedLLM
+{
+    keywords:
+        $gate = "missing-evaluator"
+    llm:
+        $model = "hostile instructions" (0.5)
+    condition:
+        keywords.$gate and not llm.$model
+}

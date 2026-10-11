@@ -16,3 +16,4 @@
 .previously
 __pycache__/
 node_modules/
+/.venv-nova/
