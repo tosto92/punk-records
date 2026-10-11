@@ -12,6 +12,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { migrateScope } from '../lib/migrate.js';
 import { handleHook } from "../lib/hook.js";
+import {runScan, runReview} from '../lib/security/cli.js';
 
 function usage() {
   console.error(
@@ -164,6 +165,10 @@ usage: previously <command> [flags]
                      browse memories in a local web viewer
   build              regenerate the derived Markdown index
   check              report files whose memories may be stale
+  scan [--local|--global] [--rules directory]
+                     report NOVA signals and incomplete scans as JSON
+  review [--local|--global]
+                     review false positives in an interactive terminal
   migrate [--apply]  upgrade old event logs
   episodes [timeline|projects|show <id>|serve] [filter] [-n N] [-d D]
                      past Claude Code / Codex sessions and how to resume them (needs python3)
@@ -231,6 +236,12 @@ switch (sub) {
     break;
   case "check":
     cmdCheck(rest);
+    break;
+  case 'scan':
+    process.exitCode = runScan(rest);
+    break;
+  case 'review':
+    process.exitCode = await runReview(rest);
     break;
   case "ask":
     cmdAsk(rest);
