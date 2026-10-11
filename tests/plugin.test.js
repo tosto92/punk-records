@@ -6,6 +6,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {saveMemory} from '../lib/save.js';
 import {loadMemories} from '../lib/build.js';
+import {securityFixture, writeSecurityStore, attack, benign} from './helpers/security.js';
 
 // The OpenCode plugin is TypeScript (OpenCode runs it under Bun); Node loads it only with type stripping (22.18+).
 const TS = {skip: !process.features?.typescript && 'this Node cannot import .ts (type stripping needs Node 22.18+)'};
@@ -137,4 +138,28 @@ test('autosave kill switch applies to V1 and V2', TS, async t => {
   const {ctx, hooks, waits} = context(cwd); const cleanup = await plugin.setup(ctx); t.after(cleanup);
   await hooks['execute.after'](afterV2('B', path.join(cwd, 'b.js')));
   assert.equal(waits.size, 0); assert.deepEqual(memories(), []);
+});
+
+test('both OpenCode wrappers exclude quarantined payloads and continue on scanner failure', TS, async t => {
+  const f = securityFixture(t);
+  writeSecurityStore(path.join(f.repo, 'memory'), [attack, benign], 'repo');
+  const {default: plugin} = await import('../.opencode/plugins/previously.ts');
+  const logs = []; t.mock.method(console, 'error', line => logs.push(line));
+  const v1 = await plugin.server({directory: f.repo});
+  await v1['chat.message']({sessionID: 'A'}, {parts: [{type: 'text', text: 'deploy'}]});
+  const {ctx, hooks} = context(f.repo); const cleanup = await plugin.setup(ctx); t.after(cleanup);
+  await hooks.prompt(promptV2('A', 'deploy'));
+  const check = async expected => {
+    const old = {system: []}; await v1['experimental.chat.system.transform']({sessionID: 'A'}, old);
+    const next = {sessionID: 'A', system: [], messages: [], options: {}, tools: {}, agent: 'build', model: {providerID: 'local', id: 'test'}};
+    await hooks.context(next);
+    for (const output of [old, next]) {
+      assert.doesNotMatch(JSON.stringify(output), /quarantined|QUARANTINED|Ignore/);
+      assert.equal(output.system.length, expected);
+      if (expected) assert.match(JSON.stringify(output), /restart safely/);
+    }
+  };
+  await check(1);
+  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing'); await check(0);
+  assert.equal(logs.length, 4);
 });

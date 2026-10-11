@@ -7,6 +7,7 @@ import {execFileSync} from 'node:child_process';
 import {saveMemory} from '../lib/save.js';
 import {loadMemories} from '../lib/build.js';
 import {autoMemoryId} from '../lib/capture.js';
+import {securityFixture} from './helpers/security.js';
 
 async function fixture(t, save = saveMemory) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-capture-'));
@@ -31,6 +32,20 @@ test('capture isolates sessions and duplicate idles do not append', async t => {
   assert.deepEqual(a.files, ['a.js']); assert.equal(a.symptoms, 'fix A');
   assert.deepEqual(b.files, ['b.js']); assert.equal(b.symptoms, 'fix B');
   assert.equal(fs.readFileSync(path.join(cwd, 'events.jsonl'), 'utf8').trim().split('\n').length, 2);
+});
+
+test('autosave_scanner_failure_does_not_duplicate_append', async t => {
+  const f = securityFixture(t);
+  const {createCapture} = await import('../lib/capture.js');
+  let saved;
+  const capture = createCapture({cwd: f.home, save(input, options) {saved = saveMemory(input, options); return saved;}});
+  t.after(() => capture.dispose());
+  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing');
+  capture.prompt('A', 'deploy'); capture.edit('A', ['a.js']);
+  await capture.idle('A'); await capture.idle('A');
+  assert.equal(saved.security.status, 'incomplete');
+  assert.equal(fs.readFileSync(path.join(f.home, 'events.jsonl'), 'utf8').trimEnd().split('\n').length, 1);
+  assert.equal(loadMemories(f.home).memories.length, 1);
 });
 
 test('failed save retains edits for retry', async t => {

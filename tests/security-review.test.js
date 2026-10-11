@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {spawn, spawnSync} from 'node:child_process';
+import {spawn, spawnSync, execFileSync} from 'node:child_process';
 import {scanStore} from '../lib/security/scan.js';
 import {readDecisions, reviewDecision, allowsMemory, recordDecision} from '../lib/security/review.js';
 
@@ -163,6 +163,20 @@ test('symlinked ledger or security directory disables exceptions and append', t 
   assert.equal(allowsMemory(suspicious, readDecisions()), false);
   assert.equal(recordDecision(entry, suspicious, 'approve').recorded, false);
   assert.equal(fs.readFileSync(target, 'utf8').trimEnd().split('\n').length, 1);
+});
+
+test('FIFO ledger disables exceptions without blocking readDecisions or retrieval', t => {
+  const file = home(t);
+  writeMemories(path.dirname(path.dirname(file)));
+  fs.mkdirSync(path.dirname(file)); execFileSync('mkfifo', [file]);
+  const program = `import {readDecisions} from ${JSON.stringify(path.join(root, 'lib/security/review.js'))};
+    import {search} from ${JSON.stringify(path.join(root, 'lib/ask.js'))};
+    console.log(JSON.stringify({ledger: readDecisions(), hits: search({query: 'repair', scope: 'global'})}));`;
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', program],
+    {encoding: 'utf8', timeout: 3000, env: {...process.env, PREVIOUSLY_SECURITY: '1'}});
+  assert.equal(child.status, 0, String(child.error || child.stderr));
+  assert.deepEqual(JSON.parse(child.stdout).ledger, {valid: false, decisions: []});
+  assert.deepEqual(JSON.parse(child.stdout).hits, []);
 });
 
 test('changed_memory_or_rule_snapshot_before_append_rejected', t => {

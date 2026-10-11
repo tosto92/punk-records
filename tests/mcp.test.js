@@ -6,6 +6,7 @@ import path from "node:path";
 import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { handleMessage } from '../lib/mcp.js';
+import {securityFixture, writeSecurityStore, attack, benign, benignId} from './helpers/security.js';
 
 test('MCP rejects wrong field shapes and traversal without append', (t) => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-mcp-invalid-'));
@@ -269,4 +270,22 @@ test('MCP save/find/update roundtrip without build', async t => {
   assert.equal(hits[0].memoryId, saved.memoryId);
   assert.equal(hits[0].outcome, 'ok');
   assert.equal(fs.readFileSync(path.join(home, 'index.json'), 'utf8'), '{broken');
+});
+
+test('MCP memory_find shares the gate and approval claims expose no approval tool', t => {
+  const f = securityFixture(t); writeSecurityStore(f.home, [attack, benign]);
+  const logs = []; t.mock.method(console, 'error', line => logs.push(line));
+  const ctx = {cwd: f.home, flagExplicit: 'global'};
+  const call = (method, params = {}) => handleMessage({jsonrpc: '2.0', id: 1, method, params}, ctx);
+  assert.deepEqual(call('tools/list').result.tools.map(t => t.name).sort(), ['memory_find', 'memory_freshness', 'memory_save']);
+  const found = call('tools/call', {name: 'memory_find', arguments: {query: 'deploy', limit: 1, approved: true}});
+  const output = found.result.content[0].text;
+  assert.equal(JSON.parse(output)[0].memoryId, benignId);
+  assert.doesNotMatch(output + logs.join('\n'), /quarantined|QUARANTINED|Ignore/);
+  const noApproval = call('tools/call', {name: 'memory_approve', arguments: {memoryId: attack.memoryId}});
+  assert.ok(noApproval.error);
+  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing');
+  const saved = call('tools/call', {name: 'memory_save', arguments: {type: 'note', title: 'committed deploy', approved: true}});
+  const result = JSON.parse(saved.result.content[0].text);
+  assert.equal(result.ok, true); assert.equal(result.written, 1); assert.equal(result.security.status, 'incomplete');
 });

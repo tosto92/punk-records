@@ -6,6 +6,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { recallBlock, relative } from "../lib/recall.js";
 import { saveMemory } from "../lib/save.js";
+import {securityFixture, writeSecurityStore, attack, benign} from './helpers/security.js';
 
 // Fresh repo plus an empty global store, so real user memories never leak in.
 function repo(t) {
@@ -44,4 +45,19 @@ test("relative keeps in-repo paths only", () => {
   assert.equal(relative("/r", "../x"), null);
   assert.equal(relative("/r", "/r"), null);
   assert.equal(relative("/r", 42), null);
+});
+
+test('repeated_recall_never_prompts', t => {
+  const f = securityFixture(t); writeSecurityStore(path.join(f.repo, 'memory'), [attack, benign], 'repo');
+  const logs = []; t.mock.method(console, 'error', line => logs.push(line));
+  for (let i = 0; i < 3; i++) {
+    const block = recallBlock('deploy', f.repo);
+    assert.match(block, /restart safely/);
+    assert.doesNotMatch(block, /quarantined|QUARANTINED|Ignore/);
+  }
+  assert.equal(logs.length, 3);
+  assert.ok(logs.every(line => /previously review/.test(line) && !/[?]|approve|quarantined|QUARANTINED/.test(line)));
+  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing');
+  assert.equal(recallBlock('deploy', f.repo), '');
+  assert.equal(logs.length, 4);
 });
