@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/images/banner.svg" alt="Punk Records" width="100%"></p>
+<p align="center"><img src="docs/images/banner.png" alt="Punk Records — shared memory for coding agents, illustrated as a floating archive connected to three satellite agents" width="100%"></p>
 
 <p align="center">
   <a href="https://github.com/tosto92/punk-records/actions/workflows/test.yml"><img alt="tests" src="https://github.com/tosto92/punk-records/actions/workflows/test.yml/badge.svg"></a>
