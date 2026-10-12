@@ -4,7 +4,7 @@ import path from 'node:path';
 
 // Policy integration uses a configured interpreter; security-scan retains real NOVA coverage.
 export function securityFixture(t) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-gate-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'previously-gate-')));
   const home = path.join(root, 'global'), repo = path.join(root, 'repo');
   fs.mkdirSync(home); fs.mkdirSync(repo); fs.mkdirSync(path.join(repo, '.previously'));
   const log = path.join(root, 'invocations.jsonl'), interpreter = path.join(root, 'scanner');

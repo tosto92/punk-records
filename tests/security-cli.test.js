@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {createHash} from 'node:crypto';
@@ -13,6 +14,19 @@ const root = path.resolve(import.meta.dirname, '..');
 const cli = path.join(root, 'bin/previously');
 const driver = path.join(import.meta.dirname, 'fixtures/security/tty_driver.py');
 const realPython = process.env.PUNK_RECORDS_PYTHON || 'python3';
+
+test('security fixture resolves a symlinked temporary directory', t => {
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-temp-'));
+  const alias = path.join(real, 'alias');
+  fs.symlinkSync(real, alias, 'dir');
+  const prior = process.env.TMPDIR;
+  process.env.TMPDIR = alias;
+  let fixture;
+  try { fixture = securityFixture(t); }
+  finally { if (prior === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = prior; }
+  t.after(() => fs.rmSync(real, {recursive: true, force: true}));
+  assert.equal(fixture.root, fs.realpathSync(fixture.root));
+});
 const run = (f, args, extra = {}) => spawnSync(process.execPath, [cli, ...args], {
   cwd: f.root, encoding: 'utf8', ...extra,
 });
