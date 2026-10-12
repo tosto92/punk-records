@@ -284,7 +284,7 @@ test('MCP memory_find shares the gate and approval claims expose no approval too
   assert.doesNotMatch(output + logs.join('\n'), /quarantined|QUARANTINED|Ignore/);
   const noApproval = call('tools/call', {name: 'memory_approve', arguments: {memoryId: attack.memoryId}});
   assert.ok(noApproval.error);
-  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing');
+  process.env.PUNK_RECORDS_PYTHON = path.join(f.root, 'missing');
   const saved = call('tools/call', {name: 'memory_save', arguments: {type: 'note', title: 'committed deploy', approved: true}});
   const result = JSON.parse(saved.result.content[0].text);
   assert.equal(result.ok, true); assert.equal(result.written, 1); assert.equal(result.security.status, 'incomplete');

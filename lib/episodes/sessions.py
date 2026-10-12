@@ -7,7 +7,7 @@ usage:
   punk-records episodes projects [filter]        one line per project: where you left off
   punk-records episodes show <id-prefix>         every prompt of one episode
   punk-records serve [--port n]                  web UI (memories + episodes) on http://127.0.0.1:4400/episodes
-  sqlite3 ~/.local/share/previously/episodes.db  ad-hoc queries (tables: sessions, prompts; view: v)
+  sqlite3 ~/.local/share/punk-records/episodes.db  ad-hoc queries for new stores (tables: sessions, prompts; view: v)
 
 Every run syncs incrementally from ~/.claude, ~/.codex and OpenCode's opencode.db
 first (CLAUDE_CONFIG_DIR, CODEX_HOME and XDG_DATA_HOME are honoured).
@@ -21,7 +21,9 @@ H = Path.home()
 CLAUDE = Path(os.environ.get("CLAUDE_CONFIG_DIR") or H / ".claude")
 CODEX = Path(os.environ.get("CODEX_HOME") or H / ".codex")
 OPENCODE = Path(os.environ.get("XDG_DATA_HOME") or H / ".local/share") / "opencode/opencode.db"
-DB = Path(os.environ.get("PREVIOUSLY_HOME") or H / ".local/share/previously") / "episodes.db"
+LEGACY_HOME = H / ".local/share/previously"
+DB = Path(os.environ.get("PUNK_RECORDS_HOME") or os.environ.get("PREVIOUSLY_HOME") or
+          (LEGACY_HOME if LEGACY_HOME.exists() else H / ".local/share/punk-records")) / "episodes.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions(

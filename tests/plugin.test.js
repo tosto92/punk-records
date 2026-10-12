@@ -160,6 +160,6 @@ test('both OpenCode wrappers exclude quarantined payloads and continue on scanne
     }
   };
   await check(1);
-  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing'); await check(0);
+  process.env.PUNK_RECORDS_PYTHON = path.join(f.root, 'missing'); await check(0);
   assert.equal(logs.length, 4);
 });

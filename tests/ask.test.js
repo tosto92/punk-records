@@ -152,8 +152,8 @@ test('protected search reports excluded suspicious and incomplete statuses separ
 
 test('security disabled preserves search output without invoking an unavailable Python', t => {
   const f = securityFixture(t); writeSecurityStore(f.home, [attack]);
-  delete process.env.PREVIOUSLY_SECURITY;
-  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing');
+  process.env.PUNK_RECORDS_SECURITY = '0';
+  process.env.PUNK_RECORDS_PYTHON = path.join(f.root, 'missing');
   const logs = []; t.mock.method(console, 'error', value => logs.push(value));
   assert.equal(search({query: 'deploy', resolved: f.resolved})[0].memoryId, attackId);
   assert.deepEqual(f.calls(), []); assert.deepEqual(logs, []);
@@ -161,7 +161,7 @@ test('security disabled preserves search output without invoking an unavailable 
 
 test('unexpected scanner exceptions fail closed with bounded count-only diagnostics', t => {
   const f = securityFixture(t); writeSecurityStore(f.home, [attack, benign]);
-  process.env.PREVIOUSLY_PYTHON = 'invalid\0interpreter';
+  process.env.PUNK_RECORDS_PYTHON = 'invalid\0interpreter';
   const logs = []; t.mock.method(console, 'error', line => logs.push(line));
   assert.deepEqual(search({query: 'deploy', resolved: f.resolved}), []);
   assert.equal(logs.length, 1); assert.match(logs[0], /2 excluded \(0 suspicious, 2 incomplete\).*punk-records review/);
@@ -169,9 +169,9 @@ test('unexpected scanner exceptions fail closed with bounded count-only diagnost
 });
 
 test('real NOVA save evidence gates shared retrieval before limiting', t => {
-  const realPython = process.env.PREVIOUSLY_PYTHON;
+  const realPython = process.env.PUNK_RECORDS_PYTHON;
   const f = securityFixture(t);
-  if (realPython === undefined) delete process.env.PREVIOUSLY_PYTHON; else process.env.PREVIOUSLY_PYTHON = realPython;
+  if (realPython === undefined) delete process.env.PUNK_RECORDS_PYTHON; else process.env.PUNK_RECORDS_PYTHON = realPython;
   const options = {cwd: f.home, scope: 'global'};
   const safe = saveMemory({type: 'note', title: 'deploy safe', solution: 'restart safely'}, options);
   const blocked = saveMemory({type: 'note', title: 'deploy quarantined title', tags: ['deploy'],

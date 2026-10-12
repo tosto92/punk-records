@@ -40,7 +40,7 @@ test('autosave_scanner_failure_does_not_duplicate_append', async t => {
   let saved;
   const capture = createCapture({cwd: f.home, save(input, options) {saved = saveMemory(input, options); return saved;}});
   t.after(() => capture.dispose());
-  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing');
+  process.env.PUNK_RECORDS_PYTHON = path.join(f.root, 'missing');
   capture.prompt('A', 'deploy'); capture.edit('A', ['a.js']);
   await capture.idle('A'); await capture.idle('A');
   assert.equal(saved.security.status, 'incomplete');

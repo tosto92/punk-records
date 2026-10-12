@@ -8,9 +8,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { createCapture, diagnostic } from "../../../lib/capture.js";
 import { recallBlock, relative } from "../../../lib/recall.js";
+import { setting } from "../../../lib/env.js";
 
 // Only tools whose native result names the written file prove a session edit.
-const autosave = () => process.env.PREVIOUSLY_AUTOSAVE !== "0";
+const autosave = () => setting("AUTOSAVE") !== "0";
 const paths = (candidates: any[]) => candidates.filter((f) => typeof f === "string" && f.trim());
 const WRITE_TOOLS: Record<string, (input: any, output: any) => any[]> = {
   write: (i, o) => paths([i?.filePath, i?.path, o?.target, o?.metadata?.filepath]),

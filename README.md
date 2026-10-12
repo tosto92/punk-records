@@ -58,7 +58,7 @@ venv; it makes no model or provider calls.
 ### As a plugin (Claude Code, Codex)
 
 ```sh
-# Claude Code: hooks, MCP server, skills and /previously-save
+# Claude Code: hooks, MCP server, skills and /punk-records-save
 claude plugin marketplace add tosto92/punk-records
 claude plugin install punk-records@punk-records
 
@@ -77,9 +77,9 @@ punk-records init --global      # from a clone: node bin/punk-records init --glo
 ```
 
 `init --global` wires every agent for all your projects: recall and capture
-hooks, the `previously` MCP server, the skills and a `/previously-save`
+hooks, the `punk-records` MCP server, the skills and a `/punk-records-save`
 command. It links both `~/.local/bin/punk-records` and the legacy
-`~/.local/bin/previously` command used by existing hooks; keep that directory
+`~/.local/bin/previously` command; keep that directory
 on your `PATH`.
 Limit it with `--agents claude,codex,opencode`; preview with `--dry-run`.
 
@@ -93,15 +93,15 @@ For example, use the plugins for Claude Code and Codex, then
 ### Just ask your agent
 
 The skills teach the agent when and how to recall and save, so plain requests
-work, in any language. The skill keeps its `previously` ID for existing installs:
-`/previously` in Claude Code and OpenCode, `$previously` in Codex. With the
-Claude Code plugin it is namespaced as `/punk-records:previously`. The
-`/previously-save` command walks the agent through saving one memory.
+work, in any language. Use `/punk-records` in Claude Code and OpenCode or
+`$punk-records` in Codex. With the Claude Code plugin it is namespaced as
+`/punk-records:punk-records`. The `/punk-records-save` command walks the agent
+through saving one memory. Legacy `previously` skill and command names still work.
 
 | You say | The agent runs |
 |---|---|
 | *Have we seen this error before?* | `punk-records ask "<the error, the files involved>"` |
-| `/previously-save` *remember how we fixed the 401 loop* | `punk-records save --type solved --title … --solution … --files …` |
+| `/punk-records-save` *remember how we fixed the 401 loop* | `punk-records save --type solved --title … --solution … --files …` |
 | *Save this as a global memory: I always use pnpm, never npm* | `punk-records save --global --type decision …` |
 | *That approach didn't work, keep it so nobody retries it* | `punk-records save --type attempt_failed …` |
 | *Turn this session's draft into a saved memory* | `punk-records save --ref <draft slug> --type solved …` |
@@ -133,7 +133,7 @@ exploring and to save what generalizes. Memory types: `solved`,
 
 Unconfigured installs are unprotected. [Set up pinned NOVA and review detected
 memories](docs/memory-security.md), then explicitly launch each agent with
-`PREVIOUSLY_SECURITY=1` and `PREVIOUSLY_PYTHON=/absolute/venv/bin/python`.
+`PUNK_RECORDS_SECURITY=1` and `PUNK_RECORDS_PYTHON=/absolute/venv/bin/python`.
 Protected recall excludes suspicious pending memories and incomplete scans;
 committed saves remain saved even when scanning fails.
 
@@ -158,8 +158,9 @@ punk-records serve                    # the same in the web UI (Episodes tab)
 A read-only SQLite index of `~/.claude`, `~/.codex` and
 `~/.local/share/opencode/opencode.db` (respecting `CLAUDE_CONFIG_DIR`,
 `CODEX_HOME` and `XDG_DATA_HOME`), synced on every call into
-`~/.local/share/previously/episodes.db`.
-Needs Python 3.9+. The `previously-episodes` skill lets the agent answer
+`~/.local/share/punk-records/episodes.db` for a new installation (existing
+`~/.local/share/previously` stores keep their path).
+Needs Python 3.9+. The `punk-records-episodes` skill lets the agent answer
 "where was I?" itself.
 
 <picture>
@@ -176,15 +177,15 @@ draft, lands in the nearest project:
 | Where the session works | Where memories are saved |
 |---|---|
 | inside a git repo | `<repo>/memory/events.jsonl`, created on the first save |
-| a folder marked with `.previously` | `<folder>/memory/events.jsonl` |
-| anywhere else | the global store, `~/.local/share/previously` (override with `PREVIOUSLY_HOME`) |
+| a folder marked with `.punk-records` or legacy `.previously` | `<folder>/memory/events.jsonl` |
+| anywhere else | the global store, `~/.local/share/punk-records` for a new install (override with `PUNK_RECORDS_HOME`) |
 
 Recall reads both the project's memories and your global ones. Use
 `punk-records save --global` for knowledge that applies to every project, and
 `--local` to force the project.
 
 - **Folders without git:** run `punk-records init --local` once. It writes the
-  `.previously` marker, and the folder gets its own memory from then on.
+  `.punk-records` marker, and the folder gets its own memory from then on.
 - **Sharing with a team:** run `punk-records init` in the repo and commit what it
   writes. Teammates who clone get the hooks, skills and MCP server without any
   global install, `AGENTS.md`/`CLAUDE.md` tell their agents how to recall and
@@ -195,33 +196,36 @@ Recall reads both the project's memories and your global ones. Use
 
 `punk-records build` regenerates browsable Markdown from the event log;
 `punk-records check` lists memories whose files changed since. Set
-`PREVIOUSLY_AUTOSAVE=0` to keep recall but stop automatic drafts.
+`PUNK_RECORDS_AUTOSAVE=0` to keep recall but stop automatic drafts.
 
 ## Uninstall
 
-`init` keeps legacy integration IDs named `previously`; remove them by hand:
+`init` also keeps legacy aliases named `previously`; remove both names by hand:
 
 - global: `~/.claude/settings.json` and `~/.codex/hooks.json` (hooks running
-  `previously hook`), `~/.claude.json` and `~/.config/opencode/opencode.json`
-  (MCP server `previously`), `~/.codex/config.toml` (block between
-  `# previously:start` and `# previously:end`), and the links
-  `~/.claude/skills/previously*`, `~/.claude/commands/previously-save.md`,
-  `~/.codex/skills/previously*`, `~/.config/opencode/skills/previously*`,
-  `~/.config/opencode/plugins/previously.ts`, `~/.local/bin/punk-records`, `~/.local/bin/previously`;
+  `previously hook` or `punk-records hook`), `~/.claude.json` and
+  `~/.config/opencode/opencode.json` (MCP server `punk-records` or `previously`),
+  `~/.codex/config.toml` (the `# punk-records:start` block, or its legacy
+  `# previously:start` form), and the `punk-records*` and `previously*` links
+  under agent skill/command directories, plus
+  `~/.config/opencode/plugins/previously.ts` and both names in `~/.local/bin/`;
 - per repo: the same entries in `.claude/`, `.codex/`, `.agents/`,
   `.opencode/`, `.mcp.json`, `opencode.json`, and the block between
-  `<!-- previously:start -->` and `<!-- previously:end -->` in `AGENTS.md`
-  and `CLAUDE.md`.
+  `<!-- punk-records:start -->` and `<!-- punk-records:end -->` in `AGENTS.md`
+  and `CLAUDE.md` (or the legacy `previously` markers).
 
-Your memories stay in `memory/` and `~/.local/share/previously` until you
-delete them.
+Your memories stay in `memory/` and the selected global store until you delete them.
 
 ## Compatibility notes
 
-The `previously` CLI alias, skill and MCP IDs, `.previously` project marker,
+The `previously` CLI and skill aliases, `.previously` project marker,
 `PREVIOUSLY_*` environment variables, and existing storage paths remain valid.
-The package and primary command are now `punk-records`; existing memories need
-no migration.
+`init` migrates its own legacy MCP IDs in place; existing memories need no
+migration. New configuration uses `punk-records` IDs and `PUNK_RECORDS_*` variables.
+Hook commands keep the `previously` alias so Claude deduplicates global and repo
+hooks during upgrades. The OpenCode loader filename and NOVA rule identifiers
+also retain their legacy names to avoid duplicate plugin loading and invalidating
+existing review decisions.
 
 To upgrade an npm installation once the new package is published, run
 `npm uninstall -g previously-on-localhost`, then `npm install -g punk-records`
@@ -237,7 +241,7 @@ Claude Code, Codex and OpenCode releases.
 ```sh
 python3.10 -m venv .venv-nova
 .venv-nova/bin/python -m pip install -r lib/security/requirements.txt
-export PREVIOUSLY_PYTHON="$PWD/.venv-nova/bin/python"
+export PUNK_RECORDS_PYTHON="$PWD/.venv-nova/bin/python"
 .venv-nova/bin/python -m unittest discover -s tests -p security_bridge_test.py -v
 npm test                      # real NOVA tests are mandatory; live smoke tests require explicit *_BIN opt-ins
 node scripts/screenshots.mjs  # regenerate docs/images from made-up demo data (needs playwright)

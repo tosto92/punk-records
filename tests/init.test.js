@@ -90,20 +90,20 @@ test("init creates markers and second run is byte-identical", () => {
   assert.ok(first.touched.length > 0);
   const after1 = snap(tmp);
 
-  assert.match(after1["AGENTS.md"], /<!-- previously:start -->/);
-  assert.match(after1["AGENTS.md"], /<!-- previously:end -->/);
+  assert.match(after1["AGENTS.md"], /<!-- punk-records:start -->/);
+  assert.match(after1["AGENTS.md"], /<!-- punk-records:end -->/);
   assert.match(after1["AGENTS.md"], /<!-- graft:start -->\ngraft stuff\n<!-- graft:end -->/);
   assert.equal(after1["memory/events.jsonl"], "");
   // default init creates BOTH scopes: repo-local and overridden global
   assert.equal(fs.readFileSync(path.join(home, "events.jsonl"), "utf8"), "");
   assert.match(after1[".gitattributes"], /memory\/events\.jsonl merge=union/);
   const oc = JSON.parse(after1["opencode.json"]);
-  assert.ok(oc.mcp["previously"]);
-  assert.equal(oc.mcp["previously"].type, "local");
-  assert.equal(oc.mcp["previously"].enabled, true);
-  assert.deepEqual(oc.mcp["previously"].command.slice(0, 1), ["node"]);
-  assert.deepEqual(oc.mcp["previously"].command.slice(2), ["mcp"]);
-  assert.ok(path.isAbsolute(oc.mcp["previously"].command[1]));
+  assert.ok(oc.mcp["punk-records"]);
+  assert.equal(oc.mcp["punk-records"].type, "local");
+  assert.equal(oc.mcp["punk-records"].enabled, true);
+  assert.deepEqual(oc.mcp["punk-records"].command.slice(0, 1), ["node"]);
+  assert.deepEqual(oc.mcp["punk-records"].command.slice(2), ["mcp"]);
+  assert.ok(path.isAbsolute(oc.mcp["punk-records"].command[1]));
   assert.ok(oc.mcp.graft, "legacy graft entry preserved");
 
   const second = initRepo({ cwd: tmp });
@@ -112,7 +112,7 @@ test("init creates markers and second run is byte-identical", () => {
   assert.equal(second.touched.length, 0);
   assert.equal(fs.readFileSync(path.join(home, "events.jsonl"), "utf8"), "");
 
-  const memBlocks = after2["AGENTS.md"].split("<!-- previously:start -->").length - 1;
+  const memBlocks = after2["AGENTS.md"].split("<!-- punk-records:start -->").length - 1;
   assert.equal(memBlocks, 1);
 
   // dry-run changes nothing
@@ -180,8 +180,8 @@ test("global init wires plugin symlink and global MCP config", () => {
   assert.equal(fs.readlinkSync(link), PLUGIN_FILE);
   // global MCP config merged (flat key)
   const oc = JSON.parse(fs.readFileSync(fakeConfig, "utf8"));
-  assert.ok(oc.mcp["previously"]);
-  assert.equal(oc.mcp["previously"].type, "local");
+  assert.ok(oc.mcp["punk-records"]);
+  assert.equal(oc.mcp["punk-records"].type, "local");
   // global skill symlinked
   const skillLink = path.join(fakeSkills, "previously");
   assert.equal(fs.readlinkSync(skillLink), path.join(ROOT, "skills", "previously"));
@@ -233,9 +233,9 @@ test("V2 init writes mcp.servers and preserves unrelated servers", t => {
   initRepo({ cwd: tmp, opencodeApi: "v2" });
   const config = JSON.parse(fs.readFileSync(path.join(tmp, "opencode.json"), "utf8"));
   assert.deepEqual(config.mcp.servers.graft, graft);
-  assert.equal(config.mcp.servers["previously"].disabled, false);
-  assert.equal(config.mcp.servers["previously"].type, "local");
-  assert.deepEqual(config.mcp.servers["previously"].command, ["node", BIN, "mcp"]);
+  assert.equal(config.mcp.servers["punk-records"].disabled, false);
+  assert.equal(config.mcp.servers["punk-records"].type, "local");
+  assert.deepEqual(config.mcp.servers["punk-records"].command, ["node", BIN, "mcp"]);
   assert.equal(config.mcp["previously"], undefined);
   assert.deepEqual(initRepo({ cwd: tmp, opencodeApi: "v2" }).touched, []);
 });

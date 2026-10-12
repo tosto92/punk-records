@@ -1,6 +1,6 @@
 ---
 name: previously-episodes
-description: Look up the user's past Claude Code, Codex and OpenCode sessions ("episodes") across all projects - timeline, where they left off per project, the prompts of one session, and the exact resume command. Use when the user asks where they left off, what they worked on (today, yesterday, this week, on project X), to find a past session about a topic, or how to resume one.
+description: Use when an existing instruction invokes the legacy previously-episodes skill name.
 ---
 
 # Punk Records — episodes
@@ -27,8 +27,8 @@ branch, and first/last prompt.
 
 ## Ad-hoc SQL
 
-`sqlite3 -header -column ~/.local/share/previously/episodes.db "<query>"`
-(the directory follows `PREVIOUSLY_HOME`). Run `punk-records episodes` once first
+`sqlite3 -header -column ~/.local/share/punk-records/episodes.db "<query>"`
+(use `~/.local/share/previously` for an existing store; `PUNK_RECORDS_HOME` and legacy `PREVIOUSLY_HOME` override the directory). Run `punk-records episodes` once first
 so the index is current.
 
 - `sessions(id, tool, cwd, project, branch, title, file, file_mtime)`: `project`

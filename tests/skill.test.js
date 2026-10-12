@@ -5,6 +5,17 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 
+test("Punk Records skills and save command have canonical names alongside legacy aliases", () => {
+  for (const name of ["punk-records", "punk-records-episodes"]) {
+    const src = fs.readFileSync(path.join(root, "skills", name, "SKILL.md"), "utf8");
+    assert.match(src, new RegExp(`^---\\nname: ${name}\\n`));
+    assert.match(src, /punk-records (ask|episodes)/);
+  }
+  assert.match(fs.readFileSync(path.join(root, "commands", "punk-records-save.md"), "utf8"), /punk-records save/);
+  assert.ok(fs.existsSync(path.join(root, "skills", "previously", "SKILL.md")));
+  assert.ok(fs.existsSync(path.join(root, "commands", "previously-save.md")));
+});
+
 test("previously skill teaches when to save and recall", () => {
   const p = path.join(root, "skills", "previously", "SKILL.md");
   assert.ok(fs.existsSync(p), "SKILL.md must exist");
@@ -37,7 +48,7 @@ test("previously skill teaches when to save and recall", () => {
 
 test("previously skill supplies the protected memory review workflow", () => {
   const src = fs.readFileSync(path.join(root, "skills", "previously", "SKILL.md"), "utf8");
-  for (const reference of ["PREVIOUSLY_SECURITY=1", "PREVIOUSLY_PYTHON", "punk-records scan", "punk-records review",
+  for (const reference of ["PUNK_RECORDS_SECURITY=1", "PUNK_RECORDS_PYTHON", "punk-records scan", "punk-records review",
     "no_signals", "suspicious", "incomplete", "pending", "false positive", "revoke", "docs/memory-security.md"]) {
     assert.ok(src.includes(reference), `must document security reference: ${reference}`);
   }

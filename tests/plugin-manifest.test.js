@@ -19,11 +19,12 @@ test('plugin manifests agree with package.json and point at files that exist', (
     assert.equal(m.version, pkg.version);
     assert.equal(m.license, pkg.license);
   }
-  for (const rel of [claude.hooks, codex.hooks, codex.skills, 'skills/previously/SKILL.md',
+  for (const rel of [claude.hooks, codex.hooks, codex.skills, 'skills/punk-records/SKILL.md',
+    'skills/punk-records-episodes/SKILL.md', 'commands/punk-records-save.md', 'skills/previously/SKILL.md',
     'skills/previously-episodes/SKILL.md', 'commands/previously-save.md']) {
     assert.ok(fs.existsSync(path.join(ROOT, rel)), rel);
   }
-  assert.deepEqual(claude.mcpServers.previously.args, ['${CLAUDE_PLUGIN_ROOT}/bin/punk-records', 'mcp']);
+  assert.deepEqual(claude.mcpServers['punk-records'].args, ['${CLAUDE_PLUGIN_ROOT}/bin/punk-records', 'mcp']);
   assert.equal(json('.claude-plugin/marketplace.json').plugins[0].name, claude.name);
   assert.equal(json('.agents/plugins/marketplace.json').plugins[0].name, codex.name);
   for (const dir of ['skills/', 'commands/', 'hooks/', '.claude-plugin/', '.codex-plugin/']) assert.ok(pkg.files.includes(dir), dir);

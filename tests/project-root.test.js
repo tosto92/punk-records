@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { resolveScopes, MARKER } from "../lib/paths.js";
+import { resolveScopes, globalDir, MARKER } from "../lib/paths.js";
 import { initRepo } from "../lib/init.js";
 import { saveMemory } from "../lib/save.js";
 import { loadMemories } from "../lib/build.js";
@@ -12,10 +12,11 @@ import { loadMemories } from "../lib/build.js";
 // Throwaway dir outside any git repo, plus an isolated HOME and global store.
 function scratch(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "mem-project-")));
-  const keys = ["HOME", "PREVIOUSLY_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME"];
+  const keys = ["HOME", "PREVIOUSLY_HOME", "PUNK_RECORDS_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME"];
   const prev = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   process.env.HOME = path.join(root, "home");
   process.env.PREVIOUSLY_HOME = path.join(root, "global");
+  delete process.env.PUNK_RECORDS_HOME;
   delete process.env.CLAUDE_CONFIG_DIR;
   delete process.env.CODEX_HOME;
   t.after(() => {
@@ -24,6 +25,22 @@ function scratch(t) {
   });
   return root;
 }
+
+test("new global stores use Punk Records while old stores and env names remain readable", (t) => {
+  const root = scratch(t);
+  const old = process.env.PREVIOUSLY_HOME;
+  const current = path.join(root, "current");
+  process.env.PUNK_RECORDS_HOME = current;
+  assert.equal(globalDir(), current);
+  process.env.PUNK_RECORDS_HOME = "";
+  assert.equal(globalDir(), old);
+  delete process.env.PUNK_RECORDS_HOME;
+  assert.equal(globalDir(), old);
+  delete process.env.PREVIOUSLY_HOME;
+  assert.equal(globalDir(), path.join(root, "home", ".local", "share", "punk-records"));
+  fs.mkdirSync(path.join(root, "home", ".local", "share", "previously"), { recursive: true });
+  assert.equal(globalDir(), path.join(root, "home", ".local", "share", "previously"));
+});
 
 test("a .previously marker makes a non-git folder a project, also from subfolders", (t) => {
   const root = scratch(t);
@@ -37,6 +54,15 @@ test("a .previously marker makes a non-git folder a project, also from subfolder
     assert.equal(r.repoName, "notes");
     assert.deepEqual(r.writes, ["local"]);
   }
+});
+
+test("the old .previously marker still resolves after the canonical marker changes", (t) => {
+  const root = scratch(t);
+  const proj = path.join(root, "old-project");
+  fs.mkdirSync(proj);
+  fs.writeFileSync(path.join(proj, ".previously"), "");
+  assert.equal(resolveScopes({}, proj).repoRoot, proj);
+  assert.equal(MARKER, ".punk-records");
 });
 
 test("the nearest root wins between a git repo and a marker", (t) => {

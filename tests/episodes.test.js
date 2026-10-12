@@ -8,6 +8,20 @@ import {spawnSync} from 'node:child_process';
 const CLI = path.resolve(import.meta.dirname, '../bin/previously');
 const hasPython = spawnSync('python3', ['--version']).status === 0;
 
+test('episodes honors legacy home when the canonical override is empty', {skip: !hasPython && 'python3 not found'}, t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-home-'));
+  t.after(() => fs.rmSync(home, {recursive: true, force: true}));
+  const legacy = path.join(home, 'store');
+  const result = spawnSync('python3', ['-c', `
+import importlib.util
+spec = importlib.util.spec_from_file_location('episodes', 'lib/episodes/sessions.py')
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+print(m.DB)
+`], {cwd: path.dirname(path.dirname(CLI)), env: {...process.env, HOME: home, PUNK_RECORDS_HOME: '', PREVIOUSLY_HOME: legacy}, encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), path.join(legacy, 'episodes.db'));
+});
+
 test('episodes indexes a Claude Code session and shows its prompts', {skip: !hasPython && 'python3 not found'}, t => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-episodes-'));
   t.after(() => fs.rmSync(home, {recursive: true, force: true}));
@@ -41,7 +55,7 @@ const env = {...process.env, HOME: home, XDG_DATA_HOME: path.join(home, '.local/
 });
 
 test('episodes without Python says so instead of crashing', () => {
-  const res = spawnSync(process.execPath, [CLI, 'episodes'], {env: {...process.env, PREVIOUSLY_PYTHON: 'no-such-python-xyz'}, encoding: 'utf8'});
+  const res = spawnSync(process.execPath, [CLI, 'episodes'], {env: {...process.env, PUNK_RECORDS_PYTHON: 'no-such-python-xyz'}, encoding: 'utf8'});
   assert.equal(res.status, 2);
   assert.match(res.stderr, /episodes needs Python 3\.9\+/);
 });

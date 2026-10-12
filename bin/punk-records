@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { migrateScope } from '../lib/migrate.js';
 import { handleHook } from "../lib/hook.js";
 import {runScan, runReview} from '../lib/security/cli.js';
+import {setting} from '../lib/env.js';
 
 function usage() {
   console.error(
@@ -128,7 +129,7 @@ function cmdCheck(args) {
     writes = ["global"];
   } else if (explicit === "local") {
     if (!resolved.repoRoot) {
-      console.error("punk-records: --local requested outside a project (git repo or .previously; run punk-records init --local)");
+      console.error("punk-records: --local requested outside a project (git repo or .punk-records; run punk-records init --local)");
       process.exit(2);
     }
     writes = ["local"];
@@ -221,7 +222,7 @@ switch (sub) {
       }
       if (apply && dryRun) throw new TypeError('--apply and --dry-run are mutually exclusive');
       const resolved = resolveScopes({explicit});
-      if (resolved.writes[0] === 'local' && !resolved.repoRoot) throw new TypeError('local scope requested outside a project (git repo or .previously; run punk-records init --local)');
+      if (resolved.writes[0] === 'local' && !resolved.repoRoot) throw new TypeError('local scope requested outside a project (git repo or .punk-records; run punk-records init --local)');
       const dir = resolved.writes[0] === 'local' ? repoDir(resolved.repoRoot) : globalDir();
       console.log(JSON.stringify(migrateScope(dir, {apply, expectedSource, refs}), null, 2));
     } catch (err) { console.error(`punk-records: ${err.message}`); process.exit(2); }
@@ -358,7 +359,7 @@ switch (sub) {
       break;
     }
     const script = fileURLToPath(new URL("../lib/episodes/sessions.py", import.meta.url));
-    const python = process.env.PREVIOUSLY_PYTHON || "python3";
+    const python = setting("PYTHON") || "python3";
     const res = spawnSync(python, [script, ...rest], { stdio: "inherit" });
     if (res.error) {
       console.error(`punk-records: episodes needs Python 3.9+ (${python}: ${res.error.code ?? res.error.message})`);

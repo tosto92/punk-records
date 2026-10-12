@@ -1,7 +1,7 @@
 # Optional memory protection
 
 Punk Records can scan compiled memories with pinned NOVA before recall. Protection
-requires `PREVIOUSLY_SECURITY=1`; unconfigured installs are unprotected. The
+requires `PUNK_RECORDS_SECURITY=1`; unconfigured installs are unprotected. The
 scanner runs locally without model downloads, credentials, provider calls, a
 daemon, or a cache. Installation is a separate, networked operator action; scanning
 never installs or updates anything.
@@ -15,18 +15,18 @@ install it is normally `$(npm root -g)/punk-records/lib/security`.
 From a checkout:
 
 ```sh
-python3.10 -m venv "$HOME/.local/share/previously-nova-venv"
-"$HOME/.local/share/previously-nova-venv/bin/python" -m pip install -r lib/security/requirements.txt
-export PREVIOUSLY_PYTHON="$HOME/.local/share/previously-nova-venv/bin/python"
+python3.10 -m venv "$HOME/.local/share/punk-records-nova-venv"
+"$HOME/.local/share/punk-records-nova-venv/bin/python" -m pip install -r lib/security/requirements.txt
+export PUNK_RECORDS_PYTHON="$HOME/.local/share/punk-records-nova-venv/bin/python"
 punk-records scan --global
-PREVIOUSLY_SECURITY=1 claude
-PREVIOUSLY_SECURITY=1 codex
-PREVIOUSLY_SECURITY=1 opencode
+PUNK_RECORDS_SECURITY=1 claude
+PUNK_RECORDS_SECURITY=1 codex
+PUNK_RECORDS_SECURITY=1 opencode
 ```
 
-`PREVIOUSLY_PYTHON` must name the interpreter, preferably an absolute path; paths
+`PUNK_RECORDS_PYTHON` must name the interpreter, preferably an absolute path; paths
 containing spaces work. Without it the scanner tries `python3`. Export it into
-the agent's environment and explicitly set `PREVIOUSLY_SECURITY=1` when launching
+the agent's environment and explicitly set `PUNK_RECORDS_SECURITY=1` when launching
 every protected agent so hooks and MCP subprocesses inherit both variables.
 `init` and plugin installation do not enable protection. An unavailable/wrong
 interpreter or engine makes protected recall incomplete and excludes affected
@@ -39,9 +39,9 @@ the artifact before installation:
 
 ```sh
 mkdir nova-wheel
-"$PREVIOUSLY_PYTHON" -m pip download --no-deps --only-binary=:all: nova-hunting==0.3.1 -d nova-wheel
-"$PREVIOUSLY_PYTHON" -c 'import hashlib,pathlib; p, = pathlib.Path("nova-wheel").glob("*.whl"); assert hashlib.sha256(p.read_bytes()).hexdigest() == "b7c529e7d54b996f73a83e124ca102588cdc421428b5dd46b146244e493bdbc0", "wheel hash mismatch"'
-"$PREVIOUSLY_PYTHON" -m pip install nova-wheel/*.whl
+"$PUNK_RECORDS_PYTHON" -m pip download --no-deps --only-binary=:all: nova-hunting==0.3.1 -d nova-wheel
+"$PUNK_RECORDS_PYTHON" -c 'import hashlib,pathlib; p, = pathlib.Path("nova-wheel").glob("*.whl"); assert hashlib.sha256(p.read_bytes()).hexdigest() == "b7c529e7d54b996f73a83e124ca102588cdc421428b5dd46b146244e493bdbc0", "wheel hash mismatch"'
+"$PUNK_RECORDS_PYTHON" -m pip install nova-wheel/*.whl
 ```
 
 This verifies the NOVA wheel, not its transitive dependencies. No Python engine is
@@ -55,9 +55,9 @@ punk-records scan --global
 punk-records scan --local --rules /absolute/path/to/experimental-rules
 ```
 
-`scan` and `review` run independently of `PREVIOUSLY_SECURITY`. They default to
+`scan` and `review` run independently of `PUNK_RECORDS_SECURITY`. They default to
 the nearest project store, or global outside a project. `--local` requires a git
-repository or `.previously` marker; `--global` selects only the global store.
+repository or `.punk-records` (or legacy `.previously`) marker; `--global` selects only the global store.
 `scan` prints escaped JSON containing scanner identity, every compiled memory
 version, field-attributed matches, incomplete rule evidence, and stable reason
 codes. It scans original fields and their combined representation before ranking
@@ -101,8 +101,9 @@ decision. Incomplete versions cannot receive exceptions. Agents must never
 approve automatically. There is no MCP approval tool. Review's exit code reports
 the scan, so approving a detected false positive still exits 1.
 
-Decisions append to global `security/reviews.jsonl`, under `PREVIOUSLY_HOME` or
-`~/.local/share/previously`. An exception binds the physical store, memory ID,
+Decisions append to global `security/reviews.jsonl`, under `PUNK_RECORDS_HOME` or
+the selected default store (`~/.local/share/punk-records` for a new install;
+`~/.local/share/previously` for an existing one). An exception binds the physical store, memory ID,
 hash of all compiled content plus store/scope, scanner engine/protocol/rules hash,
 and sorted matched-rule set. Identical IDs in different stores do not share
 decisions. Accepted paths, including aliases through symlinked ancestors, are
@@ -125,6 +126,7 @@ Default rules are local `previously.nov` plus unchanged upstream
 hashes are in `lib/security/rules/manifest.json`. `hidden_unicode.nov` is bundled
 unchanged but excluded from the default profile because it also uses unavailable
 semantic/LLM stages. The local rule includes keyword checks for hidden Unicode.
+The local rule name stays stable because review decisions bind the rule-set identity.
 
 The bridge uses the official `NovaRuleFileParser` and `NovaMatcher`, with explicit
 unavailable semantic/LLM evaluators and automatic LLM creation disabled. Ambient

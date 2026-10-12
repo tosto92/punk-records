@@ -9,7 +9,7 @@
   "keywords": ["memory", "sessions", "recall", "mcp"],
   "hooks": "./hooks/claude.json",
   "mcpServers": {
-    "previously": {
+    "punk-records": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/bin/punk-records", "mcp"]
     }

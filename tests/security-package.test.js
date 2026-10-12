@@ -32,8 +32,8 @@ test('actual npm artifact scans benign and suspicious memories outside the check
   assert.equal(extracted.status, 0, String(extracted.error || extracted.stderr));
   const cli = path.join(unpacked, 'package', 'bin', 'previously');
   assert.ok(fs.lstatSync(cli).isFile(), 'CLI is an extracted file, not a checkout link');
-  const env = {...process.env, PREVIOUSLY_HOME: store, PREVIOUSLY_PYTHON: process.env.PREVIOUSLY_PYTHON || 'python3'};
-  delete env.PREVIOUSLY_SECURITY;
+  const env = {...process.env, PREVIOUSLY_HOME: store, PUNK_RECORDS_PYTHON: process.env.PUNK_RECORDS_PYTHON || 'python3'};
+  env.PUNK_RECORDS_SECURITY = '0';
   for (const [memory, expectedCode, expectedStatus] of [[benign, 0, 'no_signals'], [attack, 1, 'suspicious']]) {
     writeSecurityStore(store, [memory]);
     const result = spawnSync(process.execPath, [cli, 'scan', '--global'], {cwd, env, encoding: 'utf8', timeout: 15000});

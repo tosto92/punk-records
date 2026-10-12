@@ -57,7 +57,7 @@ test('repeated_recall_never_prompts', t => {
   }
   assert.equal(logs.length, 3);
   assert.ok(logs.every(line => /punk-records review/.test(line) && !/[?]|approve|quarantined|QUARANTINED/.test(line)));
-  process.env.PREVIOUSLY_PYTHON = path.join(f.root, 'missing');
+  process.env.PUNK_RECORDS_PYTHON = path.join(f.root, 'missing');
   assert.equal(recallBlock('deploy', f.repo), '');
   assert.equal(logs.length, 4);
 });

@@ -27,7 +27,7 @@ jobs:
         run: |
           python -m venv .venv-nova
           .venv-nova/bin/python -m pip install -r lib/security/requirements.txt
-          echo "PREVIOUSLY_PYTHON=$PWD/.venv-nova/bin/python" >> "$GITHUB_ENV"
+          echo "PUNK_RECORDS_PYTHON=$PWD/.venv-nova/bin/python" >> "$GITHUB_ENV"
       - run: git config --global user.email ci@example.com && git config --global user.name ci
       - name: Test real NOVA bridge
         run: .venv-nova/bin/python -m unittest discover -s tests -p security_bridge_test.py -v

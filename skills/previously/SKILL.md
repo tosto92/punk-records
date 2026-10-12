@@ -1,6 +1,6 @@
 ---
 name: previously
-description: Save and recall reusable session knowledge with Punk Records. Use when a session fixes a bug, makes a technical decision, finds a workaround, learns a repo gotcha, or hears a lasting user preference; also use when facing an error, unfamiliar code, or asking "have we seen this before".
+description: Use when an existing instruction invokes the legacy previously skill name.
 ---
 
 # Punk Records
@@ -36,9 +36,9 @@ Saving, rebuilding, and `outcome: ok` are not approval.
 
 Protection is opt-in: unconfigured installs are unprotected. Follow
 [the setup and boundaries](../../docs/memory-security.md) to install pinned NOVA
-in a dedicated venv, set `PREVIOUSLY_PYTHON` to its absolute interpreter, and launch
-each agent explicitly with `PREVIOUSLY_SECURITY=1` (for example,
-`PREVIOUSLY_SECURITY=1 PREVIOUSLY_PYTHON=/absolute/venv/bin/python codex`).
+in a dedicated venv, set `PUNK_RECORDS_PYTHON` to its absolute interpreter, and launch
+each agent explicitly with `PUNK_RECORDS_SECURITY=1` (for example,
+`PUNK_RECORDS_SECURITY=1 PUNK_RECORDS_PYTHON=/absolute/venv/bin/python codex`).
 
 For an omitted memory, the human runs `punk-records scan --local` (or `--global`):
 exit 0 = `no_signals`, 1 = detection (`suspicious`), 2 = error or `incomplete`.
@@ -89,7 +89,7 @@ punk-records save --type solved \
 
 `--type`: `solved` | `attempt_failed` | `decision` | `note`.
 Scope: repo-local is the default (project facts). A project is a git repo or,
-without git, a folder marked by `punk-records init --local` (it writes `.previously`). `--global` for methods and
+without git, a folder marked by `punk-records init --local` (it writes `.punk-records`). `--global` for methods and
 preferences valid in every repo. MCP equivalent: `memory_save({...})`.
 
 `--outcome` is `open` | `partial` | `ok`; omit it and a complete `solved` becomes

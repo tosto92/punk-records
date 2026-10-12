@@ -1,4 +1,4 @@
-/* previously on localhost viewer: design tokens + app styles. Third-party viewer (MIT): see LICENSE in this folder. Local edits: memory type colours --ok/--bad, --cue and the .wordmark title card; app.js: memory wording ("Related", "spoiler"). */
+/* Punk Records viewer: design tokens + app styles. Third-party viewer (MIT): see LICENSE in this folder. Local edits: memory type colours --ok/--bad, --cue and the .wordmark title card; app.js: memory wording ("Related", "spoiler"). */
 :root{
   --bg:#F4F6F6; --panel:#FFFFFF; --panel2:#FBFCFC; --ink:#17191B; --muted:#6B7278;
   --border:#E2E6E7; --border2:#EDF0F1; --accent:#546FFF; --accent-ink:#546FFF;

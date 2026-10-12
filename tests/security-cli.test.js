@@ -12,7 +12,7 @@ import {allowsMemory, readDecisions} from '../lib/security/review.js';
 const root = path.resolve(import.meta.dirname, '..');
 const cli = path.join(root, 'bin/previously');
 const driver = path.join(import.meta.dirname, 'fixtures/security/tty_driver.py');
-const realPython = process.env.PREVIOUSLY_PYTHON || 'python3';
+const realPython = process.env.PUNK_RECORDS_PYTHON || 'python3';
 const run = (f, args, extra = {}) => spawnSync(process.execPath, [cli, ...args], {
   cwd: f.root, encoding: 'utf8', ...extra,
 });
@@ -50,7 +50,7 @@ function incompleteInterpreter(f) {
 
 test('scan reports every version and scanner identity, with incomplete before detection exit precedence', t => {
   const f = securityFixture(t);
-  delete process.env.PREVIOUSLY_SECURITY;
+  process.env.PUNK_RECORDS_SECURITY = '0';
   writeSecurityStore(f.home, [benign]);
   assert.equal(scan(f).code, 0);
   writeSecurityStore(f.home, [attack]);
@@ -259,8 +259,8 @@ test('scan compilation diagnostics escape hostile source paths and reference met
 });
 
 test('actual CLI and real NOVA scan plus TTY approval integrate without scanner bypasses', t => {
-  const f = securityFixture(t); process.env.PREVIOUSLY_PYTHON = realPython;
-  delete process.env.PREVIOUSLY_SECURITY;
+  const f = securityFixture(t); process.env.PUNK_RECORDS_PYTHON = realPython;
+  process.env.PUNK_RECORDS_SECURITY = '0';
   writeSecurityStore(f.home, [benign]); assert.equal(scan(f).code, 0);
   writeSecurityStore(f.home, [attack]);
   const before = scan(f); assert.equal(before.code, 1, JSON.stringify(before.report));

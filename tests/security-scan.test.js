@@ -8,7 +8,7 @@ import {spawnSync} from 'node:child_process';
 import {scanMemories, scanStore} from '../lib/security/scan.js';
 
 const root = path.resolve(import.meta.dirname, '..');
-const python = process.env.PREVIOUSLY_PYTHON || 'python3';
+const python = process.env.PUNK_RECORDS_PYTHON || 'python3';
 const hash = text => createHash('sha256').update(text).digest('hex');
 const memory = {memoryId: 'a'.repeat(40), slug: 'repair--' + 'a'.repeat(40), seedTitle: 'repair',
   repo: 'demo', title: 'repair', symptoms: 'ordinary issue', solution: 'restart service',
@@ -20,12 +20,12 @@ function temp(t) {
 }
 function entry(store, changes = {}, scope = 'repo') { return {store, scope, memory: {...memory, ...changes}}; }
 function configured(interpreter, callback) {
-  const before = process.env.PREVIOUSLY_PYTHON;
-  process.env.PREVIOUSLY_PYTHON = interpreter;
+  const before = process.env.PUNK_RECORDS_PYTHON;
+  process.env.PUNK_RECORDS_PYTHON = interpreter;
   try { return callback(); }
   finally {
-    if (before === undefined) delete process.env.PREVIOUSLY_PYTHON;
-    else process.env.PREVIOUSLY_PYTHON = before;
+    if (before === undefined) delete process.env.PUNK_RECORDS_PYTHON;
+    else process.env.PUNK_RECORDS_PYTHON = before;
   }
 }
 function fixture(name, callback) {

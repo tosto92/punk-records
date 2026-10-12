@@ -61,7 +61,7 @@ test('init writes the chosen API format and rejects an unknown one', t => {
 
   assert.equal(run(['--opencode-api', 'v2', '--local']).status, 0);
   const v2 = JSON.parse(fs.readFileSync(path.join(repo, 'opencode.json'), 'utf8'));
-  assert.equal(v2.mcp.servers['previously'].disabled, false);
+  assert.equal(v2.mcp.servers['punk-records'].disabled, false);
   assert.equal(v2.mcp['previously'], undefined);
   const bad = run(['--opencode-api', 'v3', '--local']);
   assert.equal(bad.status, 2);

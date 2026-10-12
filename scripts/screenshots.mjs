@@ -17,9 +17,9 @@ const { chromium } = await import("playwright").catch(() => {
   process.exit(2);
 });
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "previously-shots-"));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-shots-"));
 const home = path.join(tmp, "home");
-const env = { ...process.env, HOME: home, PREVIOUSLY_HOME: path.join(home, "store"), CLAUDE_CONFIG_DIR: "", CODEX_HOME: "" };
+const env = { ...process.env, HOME: home, PUNK_RECORDS_HOME: path.join(home, "store"), CLAUDE_CONFIG_DIR: "", CODEX_HOME: "" };
 const now = Date.now() / 1000;
 const day = 86400;
 

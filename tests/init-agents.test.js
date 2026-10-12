@@ -40,17 +40,103 @@ const commandsOf = (config, event) => (config.hooks?.[event] ?? []).flatMap((g) 
 test("repo init wires Claude Code: MCP, hooks, CLAUDE.md, skill, command", (t) => {
   const { repo, read } = sandbox(t);
   initRepo({ cwd: repo, agents: ["claude"] });
-  assert.deepEqual(read(path.join(repo, ".mcp.json")).mcpServers["previously"], { type: "stdio", command: "node", args: [BIN, "mcp"] });
+  assert.deepEqual(read(path.join(repo, ".mcp.json")).mcpServers["punk-records"], { type: "stdio", command: "node", args: [BIN, "mcp"] });
   const settings = read(path.join(repo, ".claude", "settings.json"));
   for (const e of EVENTS) assert.deepEqual(commandsOf(settings, e), [hookCommand("claude", e)]);
   assert.equal(hookCommand("claude", "Stop"), "previously hook claude Stop");
   assert.equal(settings.hooks.PostToolUse[0].matcher, "Write|Edit|MultiEdit|NotebookEdit");
-  assert.match(fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8"), /<!-- previously:start -->/);
+  assert.match(fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8"), /<!-- punk-records:start -->/);
+  assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "punk-records")), path.join(ROOT, "skills", "punk-records"));
+  assert.equal(fs.readlinkSync(path.join(repo, ".claude", "commands", "punk-records-save.md")), path.join(ROOT, "commands", "punk-records-save.md"));
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "previously")), SKILL);
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "previously-episodes")), path.join(ROOT, "skills", "previously-episodes"));
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "commands", "previously-save.md")), COMMAND);
   assert.equal(fs.existsSync(path.join(repo, "opencode.json")), false, "opencode not requested");
   assert.equal(fs.existsSync(path.join(repo, "AGENTS.md")), false, "AGENTS.md is for opencode/codex");
+});
+
+test("init upgrades owned legacy Claude and Codex entries without duplicate hooks or servers", (t) => {
+  const { root, repo, read } = sandbox(t);
+  const legacyBin = path.join(root, "node_modules", "previously-on-localhost", "bin", "previously");
+  fs.mkdirSync(path.join(repo, ".claude"), { recursive: true });
+  fs.mkdirSync(path.join(repo, ".codex"), { recursive: true });
+  fs.writeFileSync(path.join(repo, ".mcp.json"), JSON.stringify({ mcpServers: {
+    previously: { type: "stdio", command: "node", args: [legacyBin, "mcp"] },
+    foreign: { command: "foreign" },
+  } }));
+  const hooks = Object.fromEntries(EVENTS.map((event) => [event,
+    [{ hooks: [{ type: "command", command: `previously hook claude ${event}` }] }]]));
+  hooks.Stop.push({ hooks: [{ type: "command", command: "punk-records hook claude Stop" }] });
+  fs.writeFileSync(path.join(repo, ".claude", "settings.json"), JSON.stringify({ hooks }));
+  fs.writeFileSync(path.join(repo, ".codex", "config.toml"),
+    `# previously:start\n[mcp_servers.previously]\ncommand = "node"\nargs = [${JSON.stringify(legacyBin)}, "mcp"]\n# previously:end\n`);
+  fs.writeFileSync(path.join(repo, "AGENTS.md"),
+    "before\n<!-- previously:start -->\nold hints\n<!-- previously:end -->\nafter\n");
+
+  initRepo({ cwd: repo, agents: ["claude", "codex"] });
+  const mcp = read(path.join(repo, ".mcp.json")).mcpServers;
+  assert.deepEqual(Object.keys(mcp).sort(), ["foreign", "punk-records"]);
+  assert.equal(mcp["punk-records"].args[0], BIN);
+  const settings = read(path.join(repo, ".claude", "settings.json"));
+  for (const event of EVENTS) assert.deepEqual(commandsOf(settings, event), [hookCommand("claude", event)]);
+  assert.match(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.punk-records\]/);
+  assert.doesNotMatch(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /# previously:|\[mcp_servers\.previously\]/);
+  const agents = fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8");
+  assert.match(agents, /^before\n<!-- punk-records:start -->/);
+  assert.match(agents, /<!-- punk-records:end -->\nafter\n$/);
+  assert.doesNotMatch(agents, /<!-- previously:start -->/);
+  assert.deepEqual(initRepo({ cwd: repo, agents: ["claude", "codex"] }).touched, []);
+});
+
+test("init upgrades owned OpenCode MCP entries in both API formats", (t) => {
+  const { root, repo, read } = sandbox(t);
+  const legacy = { type: "local", command: ["node", path.join(root, "previously-on-localhost", "bin", "previously"), "mcp"] };
+  const file = path.join(repo, "opencode.json");
+  for (const api of ["v1", "v2"]) {
+    fs.writeFileSync(file, JSON.stringify(api === "v1"
+      ? { mcp: { previously: legacy, foreign: { command: ["other"] } } }
+      : { mcp: { servers: { previously: legacy, foreign: { command: ["other"] } } } }));
+    initRepo({ cwd: repo, agents: ["opencode"], opencodeApi: api });
+    const mcp = read(file).mcp;
+    const servers = api === "v1" ? mcp : mcp.servers;
+    assert.deepEqual(Object.keys(servers).sort(), ["foreign", "punk-records"]);
+    assert.deepEqual(servers["punk-records"].command, ["node", BIN, "mcp"]);
+  }
+});
+
+test("init leaves an unrelated legacy MCP entry untouched", (t) => {
+  const { repo, read } = sandbox(t);
+  const file = path.join(repo, ".mcp.json");
+  for (const foreign of [{ command: "node", args: ["/opt/unrelated/bin/previously", "mcp"] }, { command: "foreign", args: 42 }]) {
+    fs.writeFileSync(file, JSON.stringify({ mcpServers: { previously: foreign } }));
+    initRepo({ cwd: repo, agents: ["claude"] });
+    assert.deepEqual(read(file).mcpServers.previously, foreign);
+    assert.equal(read(file).mcpServers["punk-records"].args[0], BIN);
+  }
+});
+
+test("init preserves a foreign canonical Claude MCP entry", (t) => {
+  const { repo, read } = sandbox(t);
+  const file = path.join(repo, ".mcp.json");
+  const foreign = { command: "foreign", args: ["mcp"] };
+  fs.writeFileSync(file, JSON.stringify({ mcpServers: { "punk-records": foreign,
+    previously: { command: "node", args: [path.join(ROOT, "bin", "previously"), "mcp"] } } }));
+  initRepo({ cwd: repo, agents: ["claude"] });
+  assert.deepEqual(read(file).mcpServers["punk-records"], foreign);
+  assert.ok(read(file).mcpServers.previously);
+});
+
+test("init preserves foreign MCP entries in both OpenCode layouts", (t) => {
+  const { repo, read } = sandbox(t);
+  const file = path.join(repo, "opencode.json");
+  const foreign = { type: "local", command: ["node", "/opt/unrelated/bin/punk-records", "mcp"] };
+  const unrelated = { type: "local", command: ["node", "/opt/unrelated/bin/previously", "mcp"] };
+  for (const api of ["v1", "v2"]) {
+    const servers = { "punk-records": foreign, previously: unrelated };
+    fs.writeFileSync(file, JSON.stringify({ mcp: api === "v1" ? servers : { servers } }));
+    initRepo({ cwd: repo, agents: ["opencode"], opencodeApi: api });
+    assert.deepEqual(api === "v1" ? read(file).mcp : read(file).mcp.servers, servers);
+  }
 });
 
 test("Claude hooks merge with foreign hooks and a second run touches nothing", (t) => {
@@ -104,10 +190,10 @@ test("global init wires ~/.claude, backs up ~/.claude.json and links ~/.local/bi
   const after = read(cj);
   assert.equal(after.numStartups, 3);
   assert.ok(after.mcpServers.graft);
-  assert.deepEqual(after.mcpServers["previously"].args, [BIN, "mcp"]);
-  assert.equal(fs.readFileSync(`${cj}.previously-bak`, "utf8"), original);
+  assert.deepEqual(after.mcpServers["punk-records"].args, [BIN, "mcp"]);
+  assert.equal(fs.readFileSync(`${cj}.punk-records-bak`, "utf8"), original);
   assert.equal(fs.statSync(cj).mode & 0o777, 0o600);
-  assert.equal(fs.statSync(`${cj}.previously-bak`).mode & 0o777, 0o600);
+  assert.equal(fs.statSync(`${cj}.punk-records-bak`).mode & 0o777, 0o600);
   assert.deepEqual(commandsOf(read(path.join(home, ".claude", "settings.json")), "Stop"), ["previously hook claude Stop"]);
   assert.equal(fs.readlinkSync(path.join(home, ".claude", "skills", "previously")), SKILL);
   assert.equal(fs.readlinkSync(path.join(home, ".claude", "commands", "previously-save.md")), COMMAND);
@@ -162,7 +248,7 @@ test("foreign skill dirs are left alone; an @AGENTS.md CLAUDE.md gets no duplica
   initRepo({ cwd: repo, agents: ["claude", "codex"] });
   assert.equal(fs.lstatSync(path.join(repo, ".claude", "skills", "previously")).isDirectory(), true);
   assert.equal(fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8"), "@AGENTS.md\n");
-  assert.match(fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8"), /previously:start/);
+  assert.match(fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8"), /punk-records:start/);
 });
 
 test("--dry-run lists Claude files without writing them", (t) => {
@@ -187,7 +273,7 @@ test("CLI --agents limits platforms and rejects unknown names", (t) => {
   }
 });
 
-const block = () => `# previously:start\n[mcp_servers.previously]\ncommand = "node"\nargs = [${JSON.stringify(BIN)}, "mcp"]\n# previously:end\n`;
+const block = () => `# punk-records:start\n[mcp_servers.punk-records]\ncommand = "node"\nargs = [${JSON.stringify(BIN)}, "mcp"]\n# punk-records:end\n`;
 
 test("global init wires Codex: hooks.json, config.toml block, skill", (t) => {
   const { repo, home, read } = sandbox(t);
@@ -218,6 +304,39 @@ test("foreign Codex hook groups keep their indices; ours is appended last", (t) 
   const groups = read(file).hooks.PostToolUse;
   assert.deepEqual(groups.slice(0, 2), foreign.hooks.PostToolUse);
   assert.deepEqual(groups[2].hooks.map((h) => h.command), ["previously hook codex PostToolUse"]);
+});
+
+test("Codex hook migration preserves foreign group and hook indices", (t) => {
+  const { repo, home, read } = sandbox(t);
+  const file = path.join(home, ".codex", "hooks.json");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const foreign = { type: "command", command: "foreign stop" };
+  fs.writeFileSync(file, JSON.stringify({ hooks: { Stop: [
+    { hooks: [{ type: "command", command: "punk-records hook codex Stop" }, foreign] },
+    { hooks: [{ type: "command", command: "previously hook codex Stop" }] },
+  ] } }));
+  initRepo({ cwd: repo, explicit: "global", agents: ["codex"] });
+  const groups = read(file).hooks.Stop;
+  assert.deepEqual(groups[0].hooks[1], foreign);
+  assert.deepEqual(commandsOf(read(file), "Stop"), ["previously hook codex Stop", "foreign stop"]);
+  assert.deepEqual(groups[1].hooks, []);
+});
+
+test("Claude hook identity stays the same across global and local upgrades", (t) => {
+  const { repo, home, read } = sandbox(t);
+  const global = path.join(home, ".claude", "settings.json");
+  const local = path.join(repo, ".claude", "settings.json");
+  fs.mkdirSync(path.dirname(global), { recursive: true });
+  fs.mkdirSync(path.dirname(local), { recursive: true });
+  for (const first of ["global", "local"]) {
+    const old = { hooks: { Stop: [{ hooks: [{ type: "command", command: "previously hook claude Stop" }] }] } };
+    fs.writeFileSync(global, JSON.stringify(old));
+    fs.writeFileSync(local, JSON.stringify(old));
+    initRepo({ cwd: repo, explicit: first, agents: ["claude"] });
+    assert.equal(commandsOf(read(global), "Stop")[0], commandsOf(read(local), "Stop")[0]);
+    initRepo({ cwd: repo, explicit: first === "global" ? "local" : "global", agents: ["claude"] });
+    assert.equal(commandsOf(read(global), "Stop")[0], commandsOf(read(local), "Stop")[0]);
+  }
 });
 
 test("CODEX_HOME relocates Codex files", (t) => {
@@ -263,7 +382,7 @@ test("repo init wires Codex config, skill, AGENTS.md and (per F1) project hooks"
   initRepo({ cwd: repo, agents: ["codex"] });
   assert.equal(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), block());
   assert.equal(fs.readlinkSync(path.join(repo, ".agents", "skills", "previously")), SKILL);
-  assert.match(fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8"), /previously:start/);
+  assert.match(fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8"), /punk-records:start/);
   assert.equal(fs.existsSync(path.join(repo, ".codex", "hooks.json")), CODEX_PROJECT_HOOKS);
   if (CODEX_PROJECT_HOOKS) assert.deepEqual(commandsOf(read(path.join(repo, ".codex", "hooks.json")), "Stop"), ["previously hook codex Stop"]);
   assert.equal(fs.existsSync(path.join(repo, ".claude")), false);
@@ -274,8 +393,17 @@ test("repo init skips project Codex hooks when the global hooks.json already run
   initRepo({ cwd: repo, explicit: "global", agents: ["codex"] });
   initRepo({ cwd: repo, agents: ["codex"] });
   assert.equal(fs.existsSync(path.join(repo, ".codex", "hooks.json")), false);
-  assert.match(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.previously\]/);
+  assert.match(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.punk-records\]/);
   assert.ok(fs.existsSync(path.join(home, ".codex", "hooks.json")));
+});
+
+test("repo init also skips project Codex hooks with a canonical global command", (t) => {
+  const { repo, home } = sandbox(t);
+  const file = path.join(home, ".codex", "hooks.json");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: "punk-records hook codex Stop" }] }] } }));
+  initRepo({ cwd: repo, agents: ["codex"] });
+  assert.equal(fs.existsSync(path.join(repo, ".codex", "hooks.json")), false);
 });
 
 test("adding Codex hooks prints the approval note once", (t) => {
