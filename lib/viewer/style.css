@@ -1,37 +1,37 @@
 /* Punk Records viewer: design tokens + app styles. Third-party viewer (MIT): see LICENSE in this folder. Local edits: memory type colours --ok/--bad, --cue and the .wordmark title card; app.js: memory wording ("Related", "spoiler"). */
 :root{
-  --bg:#F4F6F6; --panel:#FFFFFF; --panel2:#FBFCFC; --ink:#17191B; --muted:#6B7278;
-  --border:#E2E6E7; --border2:#EDF0F1; --accent:#546FFF; --accent-ink:#546FFF;
-  --chip:#F0F3F3;
+  --bg:#F1F6FA; --panel:#FFFFFF; --panel2:#F7FAFC; --ink:#102B46; --muted:#5B7085;
+  --border:#D8E3EC; --border2:#E8EFF5; --accent:#087E8B; --accent-ink:#087E8B;
+  --chip:#EAF1F6;
   --sys:#4A7DF0; --con:#A06BDB; --fil:#D98E2B; --api:#C95CB8; --ok:#2F9E44; --bad:#D9480F;
   --k-file:#D98E2B; --k-class:#4A7DF0; --k-fn:#4F86C6; --k-method:#3AA7C9; --k-iface:#A06BDB; --k-type:#C95CB8; --k-enum:#B69B3D;
-  --edge:#9AA4A9; --canvas:#F8FAFA; --cue:#C99A06;
+  --edge:#9AA4A9; --canvas:#F3F8FB; --cue:#B94378;
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#0E1012; --panel:#15181B; --panel2:#111417; --ink:#E7E9EA; --muted:#8B9298;
-    --border:#252B30; --border2:#1D2226; --accent:#7B8FFF; --accent-ink:#7B8FFF;
-    --chip:#1C2125;
+    --bg:#0B1422; --panel:#111F30; --panel2:#0E1A2A; --ink:#E8F1F8; --muted:#9AAFC3;
+    --border:#293D51; --border2:#203246; --accent:#65DCE7; --accent-ink:#65DCE7;
+    --chip:#1B3044;
     --sys:#6B94F5; --con:#B487E0; --fil:#E0A04A; --api:#D183C9; --ok:#51CF66; --bad:#FF8787;
     --k-file:#E0A04A; --k-class:#6B94F5; --k-fn:#7EAEDD; --k-method:#56B9D8; --k-iface:#B487E0; --k-type:#D183C9; --k-enum:#D4BB5E;
-    --edge:#4A545B; --canvas:#101315; --cue:#F2C94C;
+    --edge:#4A545B; --canvas:#0C1827; --cue:#F5A6C8;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#0E1012; --panel:#15181B; --panel2:#111417; --ink:#E7E9EA; --muted:#8B9298;
-  --border:#252B30; --border2:#1D2226; --accent:#7B8FFF; --accent-ink:#7B8FFF;
-  --chip:#1C2125;
+  --bg:#0B1422; --panel:#111F30; --panel2:#0E1A2A; --ink:#E8F1F8; --muted:#9AAFC3;
+  --border:#293D51; --border2:#203246; --accent:#65DCE7; --accent-ink:#65DCE7;
+  --chip:#1B3044;
   --sys:#6B94F5; --con:#B487E0; --fil:#E0A04A; --api:#D183C9; --ok:#51CF66; --bad:#FF8787;
   --k-file:#E0A04A; --k-class:#6B94F5; --k-fn:#7EAEDD; --k-method:#56B9D8; --k-iface:#B487E0; --k-type:#D183C9; --k-enum:#D4BB5E;
-  --edge:#4A545B; --canvas:#101315; --cue:#F2C94C;
+  --edge:#4A545B; --canvas:#0C1827; --cue:#F5A6C8;
 }
 :root[data-theme="light"]{
-  --bg:#F4F6F6; --panel:#FFFFFF; --panel2:#FBFCFC; --ink:#17191B; --muted:#6B7278;
-  --border:#E2E6E7; --border2:#EDF0F1; --accent:#546FFF; --accent-ink:#546FFF;
-  --chip:#F0F3F3;
+  --bg:#F1F6FA; --panel:#FFFFFF; --panel2:#F7FAFC; --ink:#102B46; --muted:#5B7085;
+  --border:#D8E3EC; --border2:#E8EFF5; --accent:#087E8B; --accent-ink:#087E8B;
+  --chip:#EAF1F6;
   --sys:#4A7DF0; --con:#A06BDB; --fil:#D98E2B; --api:#C95CB8; --ok:#2F9E44; --bad:#D9480F;
   --k-file:#D98E2B; --k-class:#4A7DF0; --k-fn:#4F86C6; --k-method:#3AA7C9; --k-iface:#A06BDB; --k-type:#C95CB8; --k-enum:#B69B3D;
-  --edge:#9AA4A9; --canvas:#F8FAFA; --cue:#C99A06;
+  --edge:#9AA4A9; --canvas:#F3F8FB; --cue:#B94378;
 }
 
 *{box-sizing:border-box}
@@ -47,10 +47,10 @@ body{
 button:focus-visible,input:focus-visible,.tree-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .appbar{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel);flex:none}
-.brand{display:flex;align-items:baseline;gap:8px;flex:none}
+.brand{display:flex;align-items:center;gap:12px;flex:none}
 .switch{display:inline-flex;align-self:center;background:var(--chip);border-radius:9px;padding:3px;gap:2px}.switch a{color:var(--muted);font-size:13px;font-weight:600;text-decoration:none;padding:5px 14px;border-radius:7px}.switch a:hover{color:var(--ink)}.switch a[aria-current]{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 .brand b{font-weight:700;letter-spacing:-.01em}
-.brand .wordmark{color:var(--ink);font:italic 400 21px/1 "Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;letter-spacing:-.01em;white-space:nowrap}
+.brand .wordmark{color:var(--ink);display:inline-flex;align-items:center;gap:9px;font:800 17px/1.1 "Segoe UI",system-ui,sans-serif;letter-spacing:-.035em;text-transform:uppercase;white-space:nowrap}
 .brand .wordmark .cue{color:var(--cue);font:inherit}
 .brand span{color:var(--muted);font-size:13px}
 .counts{color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;flex:none}
@@ -66,7 +66,7 @@ button:focus-visible,input:focus-visible,.tree-row:focus-visible{outline:2px sol
 .iconbtn:hover{border-color:var(--muted)}
 
 .stage{display:flex;flex:1;min-height:0;background:var(--canvas)}
-.canvas-wrap{position:relative;flex:1;min-width:0}
+.canvas-wrap{position:relative;flex:1;min-width:0;background-image:radial-gradient(var(--border) .7px,transparent .7px);background-size:22px 22px}
 svg.graph{display:block;width:100%;height:100%;cursor:grab}
 svg.graph:active{cursor:grabbing}
 
@@ -154,3 +154,10 @@ svg.graph:active{cursor:grabbing}
 .own-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .own-why{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 .own-note{font-size:11px;color:var(--muted);padding:3px 8px 0;line-height:1.45}
+
+.brand-mark{flex:none;object-fit:contain}
+.appbar{flex-wrap:wrap}
+.brand{flex-wrap:wrap}
+.switch a[aria-current]{color:var(--accent);box-shadow:inset 0 -2px var(--accent)}
+.brand .wordmark{color:var(--ink)}
+@media(max-width:760px){.appbar{gap:8px;padding:10px 12px}.brand{width:100%;gap:10px}.brand #repoName{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.brand .switch{margin-left:auto}.tabs{margin-left:0}.searchbox{flex:1;min-width:100px}.searchbox input{width:100%}.brand .wordmark{font-size:15px}}

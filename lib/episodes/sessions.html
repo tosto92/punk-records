@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Episodes — Punk Records</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2040%2044%22%3E%3Cpath%20d%3D%22M3%2022C4%2012%2011%202%2020%202s16%2010%2017%2020l-7-5-5%206-6-6-6%206-5-5Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22m4%2029%207%203%205-5%206%206%206-5%208%202c-2%209-8%2012-16%2012S6%2038%204%2029Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2226%22%20r%3D%224%22%20fill%3D%22%2365E1EB%22%2F%3E%3C%2Fsvg%3E">
 <style>
   /* Tokens shared with the memory viewer (lib/viewer/style.css). */
   :root {
-    --bg: #F4F6F6; --panel: #FFFFFF; --panel2: #FBFCFC; --ink: #17191B; --muted: #6B7278;
-    --border: #E2E6E7; --chip: #F0F3F3; --accent: #546FFF; --cue: #C99A06;
+    --bg: #F1F6FA; --panel: #FFFFFF; --panel2: #F7FAFC; --ink: #102B46; --muted: #5B7085;
+    --border: #D8E3EC; --chip: #EAF1F6; --accent: #087E8B; --cue: #B94378;
     --claude: #C15F3C; --codex: #0E8A6A;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #0E1012; --panel: #15181B; --panel2: #111417; --ink: #E7E9EA; --muted: #8B9298;
-            --border: #252B30; --chip: #1C2125; --accent: #7B8FFF; --cue: #F2C94C;
+    :root { --bg: #0B1422; --panel: #111F30; --panel2: #0E1A2A; --ink: #E8F1F8; --muted: #9AAFC3;
+            --border: #293D51; --chip: #1B3044; --accent: #65DCE7; --cue: #F5A6C8;
             --claude: #E0896A; --codex: #3CCF9F; }
   }
   * { box-sizing: border-box; }
@@ -24,9 +25,9 @@
 
   header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 16px;
            background: var(--panel); border-bottom: 1px solid var(--border); flex: none; }
-  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
-  .wordmark { font: italic 400 21px/1 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
-              letter-spacing: -.01em; white-space: nowrap; }
+  .brand { display: flex; align-items: center; gap: 16px; margin-right: auto; flex-wrap: wrap; }
+  .wordmark { display: inline-flex; align-items: center; gap: 9px; font: 800 17px/1.1 "Segoe UI", system-ui, sans-serif;
+              letter-spacing: -.035em; text-transform: uppercase; white-space: nowrap; }
   .wordmark .cue, .tbc .cue { color: var(--cue); }
   a.wordmark { color: inherit; text-decoration: none; }
   .brand .page { color: var(--muted); font-size: 13px; }
@@ -50,7 +51,7 @@
   .proj .muted { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   #tl { overflow-y: auto; padding: 4px 24px 48px; }
-  .day { font: italic 400 19px/1.3 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif; margin: 22px 0 8px; }
+  .day { font: 700 17px/1.3 "Segoe UI", system-ui, sans-serif; margin: 22px 0 8px; }
   .pgroup { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
   .ph { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; border-bottom: 1px solid var(--border); font-weight: 600; }
   .sess { display: grid; grid-template-columns: 92px 72px 1fr auto; gap: 12px; align-items: baseline; width: 100%;
@@ -87,11 +88,14 @@
     .sess .title { grid-column: 1 / -1; }
     .sess .count { display: none; }
   }
+.brand-mark{flex:none;object-fit:contain}
+  .switch a[aria-current]{color:var(--accent);box-shadow:inset 0 -2px var(--accent)}
+  @media(max-width:760px){.brand{gap:10px}.wordmark{font-size:15px}}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand"><a class="wordmark" href="/" id="home" title="Show all projects">Punk Records</a><nav class="switch" aria-label="Page"><a href="/">Memories</a><a href="/episodes" aria-current="page">Episodes</a></nav></div>
+  <div class="brand"><a class="wordmark" href="/" id="home" title="Show all projects"><img class="brand-mark" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2040%2044%22%3E%3Cpath%20d%3D%22M3%2022C4%2012%2011%202%2020%202s16%2010%2017%2020l-7-5-5%206-6-6-6%206-5-5Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22m4%2029%207%203%205-5%206%206%206-5%208%202c-2%209-8%2012-16%2012S6%2038%204%2029Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2226%22%20r%3D%224%22%20fill%3D%22%2365E1EB%22%2F%3E%3C%2Fsvg%3E" alt="" width="32" height="36">Punk Records</a><nav class="switch" aria-label="Page"><a href="/">Memories</a><a href="/episodes" aria-current="page">Episodes</a></nav></div>
   <input id="q" type="search" placeholder="Filter by project, title, branch or prompt" aria-label="Filter episodes">
   <select id="days" aria-label="Period">
     <option value="1">Today</option><option value="3">Last 3 days</option>
