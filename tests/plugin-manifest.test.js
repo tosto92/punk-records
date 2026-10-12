@@ -15,7 +15,7 @@ test('plugin manifests agree with package.json and point at files that exist', (
   const claude = json('.claude-plugin/plugin.json');
   const codex = json('.codex-plugin/plugin.json');
   for (const m of [claude, codex]) {
-    assert.equal(m.name, 'previously');
+    assert.equal(m.name, 'punk-records');
     assert.equal(m.version, pkg.version);
     assert.equal(m.license, pkg.license);
   }
@@ -23,7 +23,7 @@ test('plugin manifests agree with package.json and point at files that exist', (
     'skills/previously-episodes/SKILL.md', 'commands/previously-save.md']) {
     assert.ok(fs.existsSync(path.join(ROOT, rel)), rel);
   }
-  assert.deepEqual(claude.mcpServers.previously.args, ['${CLAUDE_PLUGIN_ROOT}/bin/previously', 'mcp']);
+  assert.deepEqual(claude.mcpServers.previously.args, ['${CLAUDE_PLUGIN_ROOT}/bin/punk-records', 'mcp']);
   assert.equal(json('.claude-plugin/marketplace.json').plugins[0].name, claude.name);
   assert.equal(json('.agents/plugins/marketplace.json').plugins[0].name, codex.name);
   for (const dir of ['skills/', 'commands/', 'hooks/', '.claude-plugin/', '.codex-plugin/']) assert.ok(pkg.files.includes(dir), dir);
@@ -38,7 +38,7 @@ for (const agent of ['claude', 'codex']) {
     t.after(() => fs.rmSync(home, {recursive: true, force: true}));
     for (const event of EVENTS) {
       const [{command}] = hooks[event][0].hooks;
-      assert.equal(command, `node "\${CLAUDE_PLUGIN_ROOT}/bin/previously" hook ${agent} ${event}`);
+      assert.equal(command, `node "\${CLAUDE_PLUGIN_ROOT}/bin/punk-records" hook ${agent} ${event}`);
       const input = JSON.stringify({session_id: 's1', cwd: home, hook_event_name: event, prompt: 'hello'});
       const res = spawnSync('sh', ['-c', command], {input, encoding: 'utf8',
         env: {...process.env, CLAUDE_PLUGIN_ROOT: ROOT, PREVIOUSLY_HOME: path.join(home, 'store')}});

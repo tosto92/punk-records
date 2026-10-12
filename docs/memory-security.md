@@ -1,6 +1,6 @@
 # Optional memory protection
 
-Previously can scan compiled memories with pinned NOVA before recall. Protection
+Punk Records can scan compiled memories with pinned NOVA before recall. Protection
 requires `PREVIOUSLY_SECURITY=1`; unconfigured installs are unprotected. The
 scanner runs locally without model downloads, credentials, provider calls, a
 daemon, or a cache. Installation is a separate, networked operator action; scanning
@@ -11,14 +11,14 @@ never installs or updates anything.
 Use Python 3.10 or later and a dedicated virtual environment. The npm artifact
 includes the bridge, requirement, rules, manifest, and upstream license under
 `lib/security/`. Find that directory in your installed package; for a global npm
-install it is normally `$(npm root -g)/previously-on-localhost/lib/security`.
+install it is normally `$(npm root -g)/punk-records/lib/security`.
 From a checkout:
 
 ```sh
 python3.10 -m venv "$HOME/.local/share/previously-nova-venv"
 "$HOME/.local/share/previously-nova-venv/bin/python" -m pip install -r lib/security/requirements.txt
 export PREVIOUSLY_PYTHON="$HOME/.local/share/previously-nova-venv/bin/python"
-previously scan --global
+punk-records scan --global
 PREVIOUSLY_SECURITY=1 claude
 PREVIOUSLY_SECURITY=1 codex
 PREVIOUSLY_SECURITY=1 opencode
@@ -45,14 +45,14 @@ mkdir nova-wheel
 ```
 
 This verifies the NOVA wheel, not its transitive dependencies. No Python engine is
-bundled or automatically installed by Previously.
+bundled or automatically installed by Punk Records.
 
 ## Scan and interpret results
 
 ```sh
-previously scan --local
-previously scan --global
-previously scan --local --rules /absolute/path/to/experimental-rules
+punk-records scan --local
+punk-records scan --global
+punk-records scan --local --rules /absolute/path/to/experimental-rules
 ```
 
 `scan` and `review` run independently of `PREVIOUSLY_SECURITY`. They default to
@@ -61,7 +61,7 @@ repository or `.previously` marker; `--global` selects only the global store.
 `scan` prints escaped JSON containing scanner identity, every compiled memory
 version, field-attributed matches, incomplete rule evidence, and stable reason
 codes. It scans original fields and their combined representation before ranking
-or recap truncation. It never truncates input and calls it clean.
+or recall truncation. It never truncates input and calls it clean.
 
 | Result | Meaning | Protected recall |
 |---|---|---|
@@ -85,8 +85,8 @@ derived files are not security approval.
 ## Human review, exceptions, and revocation
 
 ```sh
-previously review --local
-previously review --global
+punk-records review --local
+punk-records review --global
 ```
 
 Review requires both input and output to be real TTYs and rejects piped decisions.

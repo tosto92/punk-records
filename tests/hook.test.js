@@ -43,7 +43,7 @@ test('UserPromptSubmit returns additionalContext only when a memory is relevant'
   saveMemory({type: 'solved', title: 'Zebra quartz deploy gotcha', symptoms: 'zebra quartz deploy fails', solution: 'Use the PLATYPUS flag'}, {cwd});
   const out = await handleHook('claude', 'UserPromptSubmit', ev(cwd, {prompt: 'zebra quartz deploy'}));
   assert.equal(out.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
-  assert.match(out.hookSpecificOutput.additionalContext, /^<previously>[\s\S]*Zebra quartz deploy gotcha/);
+  assert.match(out.hookSpecificOutput.additionalContext, /^<punk-records>[\s\S]*Zebra quartz deploy gotcha/);
   const codex = await handleHook('codex', 'UserPromptSubmit', ev(cwd, {prompt: 'zebra quartz deploy'}));
   assert.equal(codex !== null, RECALL_OUTPUT.codex);
 });

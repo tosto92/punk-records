@@ -17,7 +17,7 @@ test.after(() => fs.rmSync(SANDBOX_HOME, { recursive: true, force: true }));
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PLUGIN_FILE = path.join(ROOT, ".opencode", "plugins", "previously.ts");
-const BIN = path.join(ROOT, "bin", "previously");
+const BIN = path.join(ROOT, "bin", "punk-records");
 
 // A fresh git repo plus fully isolated global scope; nothing leaks to the real home.
 function fixture(t, env = {}) {

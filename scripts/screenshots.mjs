@@ -10,7 +10,7 @@ import path from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const BIN = path.join(ROOT, "bin", "previously");
+const BIN = path.join(ROOT, "bin", "punk-records");
 const OUT = path.join(ROOT, "docs", "images");
 const { chromium } = await import("playwright").catch(() => {
   console.error("playwright not found: npm i --no-save playwright && npx playwright install chromium");
@@ -76,11 +76,12 @@ const graphServer = serve(["graph", "--serve", "--port", "18788"], 18788);
 await new Promise((r) => setTimeout(r, 1500));
 
 fs.mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
+let browser;
 try {
+  browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
   for (const scheme of ["light", "dark"]) {
     const page = await browser.newPage({ viewport: { width: 1200, height: 720 }, deviceScaleFactor: 2, colorScheme: scheme });
-    await page.goto(episodesServer.url);
+    await page.goto(episodesServer.url + "episodes");
     await page.waitForSelector(".sess");
     await page.screenshot({ path: path.join(OUT, `episodes-${scheme}.png`) });
     await page.goto(graphServer.url);
@@ -91,7 +92,7 @@ try {
     await page.close();
   }
 } finally {
-  await browser.close();
+  await browser?.close();
   for (const { child } of [episodesServer, graphServer]) { try { process.kill(-child.pid); } catch { /* already gone */ } }
   fs.rmSync(tmp, { recursive: true, force: true });
 }

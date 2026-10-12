@@ -1,12 +1,12 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "previously-on-localhost",
-  "description": "Previously on localhost: session memory for coding agents.",
+  "name": "punk-records",
+  "description": "Punk Records: local session memory for coding agents.",
   "owner": { "name": "Tommaso Tosi", "url": "https://github.com/tosto92" },
   "plugins": [
     {
-      "name": "previously",
-      "description": "A recap of past sessions before every turn, cliffhanger drafts at turn end, and your past episodes.",
+      "name": "punk-records",
+      "description": "Local memory, automatic recall and session history for coding agents.",
       "source": "./",
       "category": "productivity"
     }

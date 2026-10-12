@@ -33,7 +33,7 @@ const env = {...process.env, HOME: home, XDG_DATA_HOME: path.join(home, '.local/
   const show = run(['show', sid.slice(0, 8)]);
   assert.equal(show.status, 0, show.stderr);
   assert.match(show.stdout, /fix the zebra login bug/);
-  assert.match(run(['--help']).stdout, /previously episodes timeline/);
+  assert.match(run(['--help']).stdout, /punk-records episodes timeline/);
 
   const api = JSON.parse(run(['api', '/api/session', `id=${sid.slice(0, 8)}`]).stdout);
   assert.equal(api.session.title, 'Zebra login');

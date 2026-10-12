@@ -5,6 +5,19 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync, execFileSync} from 'node:child_process';
 
+test('Punk Records is the package and CLI name while the old CLI still runs', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8'));
+  assert.equal(pkg.name, 'punk-records');
+  assert.equal(pkg.bin['punk-records'], 'bin/punk-records');
+  assert.equal(pkg.bin.previously, 'bin/previously');
+  for (const file of [pkg.bin['punk-records'], pkg.bin.previously]) {
+    const result = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '..', file), '--help'], {encoding: 'utf8'});
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^Punk Records — session memory for coding agents/m);
+    assert.match(result.stdout, /^usage: punk-records /m);
+  }
+});
+
 test('init rejects its first unknown flag before any writes', t => {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-cli-flags-'));
   t.after(() => fs.rmSync(repo, {recursive: true, force: true}));

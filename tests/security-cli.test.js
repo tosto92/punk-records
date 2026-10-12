@@ -84,7 +84,7 @@ test('strict command flags reject conflicting scopes, unknown arguments, missing
   ]) {
     const result = run(f, args);
     assert.equal(result.status, 2, JSON.stringify(args));
-    assert.match(result.stderr, /previously:/);
+    assert.match(result.stderr, /punk-records:/);
   }
   assert.deepEqual(f.calls(), []);
   assert.deepEqual(rows(f), []);

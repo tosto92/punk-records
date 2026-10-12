@@ -19,12 +19,12 @@ body:
     id: versions
     attributes:
       label: Versions
-      description: "`previously --version`, `node --version`, and the agent (Claude Code / Codex / OpenCode) with its version"
+      description: "`punk-records --version`, `node --version`, and the agent (Claude Code / Codex / OpenCode) with its version"
     validations:
       required: true
   - type: dropdown
     id: install
     attributes:
       label: Installed via
-      options: [Claude Code plugin, Codex plugin, previously init --global, previously init (per repo)]
+      options: [Claude Code plugin, Codex plugin, punk-records init --global, punk-records init (per repo)]
       multiple: true

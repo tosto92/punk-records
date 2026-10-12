@@ -1,9 +1,10 @@
 {
-  "name": "previously-on-localhost",
+  "name": "punk-records",
   "version": "0.1.0",
-  "description": "Session memory for coding agents (Claude Code, Codex, OpenCode): a recap of past sessions before every turn.",
+  "description": "Punk Records: local session memory for coding agents (Claude Code, Codex, OpenCode).",
   "type": "module",
   "bin": {
+    "punk-records": "bin/punk-records",
     "previously": "bin/previously"
   },
   "files": [
@@ -36,10 +37,10 @@
   ],
   "author": "Tommaso Tosi (https://github.com/tosto92)",
   "license": "MIT",
-  "homepage": "https://github.com/tosto92/previously-on-localhost#readme",
+  "homepage": "https://github.com/tosto92/punk-records#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tosto92/previously-on-localhost.git"
+    "url": "git+https://github.com/tosto92/punk-records.git"
   },
-  "bugs": "https://github.com/tosto92/previously-on-localhost/issues"
+  "bugs": "https://github.com/tosto92/punk-records/issues"
 }

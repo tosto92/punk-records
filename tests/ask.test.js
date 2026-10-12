@@ -107,7 +107,7 @@ test('protected search gates before ranking and scans both stores in one batch',
   assert.equal(f.calls()[0].length, 3);
   assert.equal(search({query: 'deploy', resolved: f.resolved}).some(h => h.memoryId === attackId), false);
   assert.equal(logs.length, 2);
-  assert.ok(logs.every(line => line.length < 300 && /previously review/.test(line)));
+  assert.ok(logs.every(line => line.length < 300 && /punk-records review/.test(line)));
   assert.doesNotMatch(logs.join('\n'), /quarantined|QUARANTINED|Ignore/);
   const cli = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/previously'), 'ask', 'deploy'],
     {cwd: f.repo, env: process.env, encoding: 'utf8'});
@@ -164,7 +164,7 @@ test('unexpected scanner exceptions fail closed with bounded count-only diagnost
   process.env.PREVIOUSLY_PYTHON = 'invalid\0interpreter';
   const logs = []; t.mock.method(console, 'error', line => logs.push(line));
   assert.deepEqual(search({query: 'deploy', resolved: f.resolved}), []);
-  assert.equal(logs.length, 1); assert.match(logs[0], /2 excluded \(0 suspicious, 2 incomplete\).*previously review/);
+  assert.equal(logs.length, 1); assert.match(logs[0], /2 excluded \(0 suspicious, 2 incomplete\).*punk-records review/);
   assert.doesNotMatch(logs[0], /invalid|interpreter|quarantined|QUARANTINED/);
 });
 

@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/previously\" hook codex UserPromptSubmit",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/punk-records\" hook codex UserPromptSubmit",
             "timeout": 10
           }
         ]
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/previously\" hook codex PostToolUse",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/punk-records\" hook codex PostToolUse",
             "timeout": 10
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/previously\" hook codex Stop",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/punk-records\" hook codex Stop",
             "timeout": 10
           }
         ]

@@ -67,7 +67,7 @@ test('native V1 apply_patch and V2 patch capture every affected file', TS, async
 
 test('direct entrypoint registers one plugin; V1 sessions and hooks are isolated', TS, async t => {
   const {cwd, module, plugin, memories} = await fixture(t);
-  assert.equal(plugin.id, 'previously');
+  assert.equal(plugin.id, 'punk-records');
   assert.deepEqual(Object.keys(module), ['default']);
   const hooks = await plugin.server({directory: cwd});
   await hooks['chat.message']({sessionID: 'A'}, {parts: [{type: 'text', text: 'fix A'}]});

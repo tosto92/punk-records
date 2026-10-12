@@ -4,8 +4,8 @@ Thanks for helping. Ground rules:
 
 - **Zero runtime dependencies.** Node standard library only (Python standard
   library for `episodes`). A dependency needs a very good reason.
-- **Never block the agent.** `previously hook` always exits 0; a broken memory
-  store must degrade to "no recap", not to a failed turn.
+- **Never block the agent.** The legacy `previously hook` entrypoint always exits 0; a broken memory
+  store must degrade to "no recall", not to a failed turn.
 - **Never touch what isn't ours.** `init` merges into config files that belong
   to the user and to other tools: add only entries named `previously`, keep
   everything else byte-for-byte.

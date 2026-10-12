@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Episodes — Previously on localhost</title>
+<title>Episodes — Punk Records</title>
 <style>
-  /* Tokens shared with the memory viewer (lib/viewer/style.css); --cue is the recap-caption yellow. */
+  /* Tokens shared with the memory viewer (lib/viewer/style.css). */
   :root {
     --bg: #F4F6F6; --panel: #FFFFFF; --panel2: #FBFCFC; --ink: #17191B; --muted: #6B7278;
     --border: #E2E6E7; --chip: #F0F3F3; --accent: #546FFF; --cue: #C99A06;
@@ -91,7 +91,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><a class="wordmark" href="/" id="home" title="Show all series">Previously on localhost<span class="cue">…</span></a><nav class="switch" aria-label="Page"><a href="/">Memories</a><a href="/episodes" aria-current="page">Episodes</a></nav></div>
+  <div class="brand"><a class="wordmark" href="/" id="home" title="Show all projects">Punk Records</a><nav class="switch" aria-label="Page"><a href="/">Memories</a><a href="/episodes" aria-current="page">Episodes</a></nav></div>
   <input id="q" type="search" placeholder="Filter by project, title, branch or prompt" aria-label="Filter episodes">
   <select id="days" aria-label="Period">
     <option value="1">Today</option><option value="3">Last 3 days</option>
@@ -99,7 +99,7 @@
   </select>
 </header>
 <main>
-  <aside><h2>Series</h2><div id="projects"></div></aside>
+  <aside><h2>Projects</h2><div id="projects"></div></aside>
   <section id="tl" aria-live="polite"></section>
 </main>
 <dialog id="dlg"></dialog>
@@ -113,8 +113,8 @@ const when = ts => t(ts, {month: "short", day: "numeric", hour: "2-digit", minut
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const cut = (s, n = 110) => { s = String(s || "").replace(/\s+/g, " "); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
 
-// The selected series is separate from the text filter: the filter narrows the
-// list of series, the selection only narrows the timeline.
+// The selected project is separate from the text filter: the filter narrows the
+// list of projects, the selection only narrows the timeline.
 let sel = "";
 
 async function load() {
@@ -125,8 +125,8 @@ async function load() {
 
   $("#projects").innerHTML = `
     <button class="proj ${sel ? "" : "on"}" data-p="">
-      <b>All series</b>
-      <span class="muted">${d.projects.length} series</span>
+      <b>All projects</b>
+      <span class="muted">${d.projects.length} projects</span>
     </button>` + d.projects.map(p => `
     <button class="proj ${sel === p.project ? "on" : ""}" data-p="${esc(p.project)}" title="${esc(p.project)}">
       <b>${esc(home(p.project))}</b>

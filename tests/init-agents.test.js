@@ -9,7 +9,7 @@ import { initRepo, hookCommand, CODEX_PROJECT_HOOKS } from "../lib/init.js";
 import { MATCHERS } from "../lib/hook-tools.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const BIN = path.join(ROOT, "bin", "previously");
+const BIN = path.join(ROOT, "bin", "punk-records");
 const SKILL = path.join(ROOT, "skills", "previously");
 const COMMAND = path.join(ROOT, "commands", "previously-save.md");
 const EVENTS = ["UserPromptSubmit", "PostToolUse", "Stop"];
@@ -80,7 +80,7 @@ test("a malformed Claude config aborts init before any write", (t) => {
     fs.mkdirSync(path.join(repo, path.dirname(rel)), { recursive: true });
     fs.writeFileSync(path.join(repo, rel), body);
     const before = fs.readdirSync(repo).sort();
-    assert.throws(() => initRepo({ cwd: repo, agents: ["claude"] }), /^Error: previously: /);
+    assert.throws(() => initRepo({ cwd: repo, agents: ["claude"] }), /^Error: punk-records: /);
     assert.deepEqual(fs.readdirSync(repo).sort(), before, rel);
     assert.equal(fs.readFileSync(path.join(repo, rel), "utf8"), body);
     assert.equal(fs.existsSync(path.join(root, "store")), false);
@@ -112,9 +112,26 @@ test("global init wires ~/.claude, backs up ~/.claude.json and links ~/.local/bi
   assert.equal(fs.readlinkSync(path.join(home, ".claude", "skills", "previously")), SKILL);
   assert.equal(fs.readlinkSync(path.join(home, ".claude", "commands", "previously-save.md")), COMMAND);
   assert.equal(fs.readlinkSync(path.join(home, ".local", "bin", "previously")), BIN);
+  assert.equal(fs.readlinkSync(path.join(home, ".local", "bin", "punk-records")), BIN);
   assert.equal(fs.existsSync(path.join(repo, ".claude")), false, "global init leaves the repo alone");
   for (const p of touched) assert.ok(p.startsWith(home) || p.startsWith(process.env.PREVIOUSLY_HOME), `outside sandbox: ${p}`);
   assert.deepEqual(initRepo({ cwd: repo, explicit: "global", agents: ["claude"] }).touched, []);
+});
+
+test("global init replaces links left by the old npm package", (t) => {
+  const { root, repo, home } = sandbox(t);
+  const oldRoot = path.join(root, "node_modules", "previously-on-localhost");
+  const links = [
+    [path.join(home, ".local", "bin", "previously"), path.join(oldRoot, "bin", "previously"), BIN],
+    [path.join(home, ".claude", "skills", "previously"), path.join(oldRoot, "skills", "previously"), SKILL],
+    [path.join(root, "plugins", "previously.ts"), path.join(oldRoot, ".opencode", "plugins", "previously.ts"), path.join(ROOT, ".opencode", "plugins", "previously.ts")],
+  ];
+  for (const [dest, old] of links) {
+    fs.mkdirSync(path.dirname(dest), {recursive: true});
+    fs.symlinkSync(old, dest);
+  }
+  initRepo({cwd: repo, explicit: "global", agents: ["claude", "opencode"]});
+  for (const [dest, , current] of links) assert.equal(fs.readlinkSync(dest), current);
 });
 
 test("CLAUDE_CONFIG_DIR relocates settings, skills and .claude.json", (t) => {

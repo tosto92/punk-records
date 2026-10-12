@@ -14,9 +14,9 @@ test("previously skill teaches when to save and recall", () => {
   for (const trigger of ["bug", "decision", "workaround", "preference"]) {
     assert.ok(src.toLowerCase().includes(trigger), `must mention save trigger: ${trigger}`);
   }
-  assert.ok(src.includes("previously ask"), "must teach recall-first");
+  assert.ok(src.includes("punk-records ask"), "must teach recall-first");
   assert.match(src, /blocked in auto mode/, "must teach recording tool blocks as facts");
-  assert.ok(src.includes("previously save"), "must teach save mechanics");
+  assert.ok(src.includes("punk-records save"), "must teach save mechanics");
   assert.ok(src.includes("--ref"), "must teach draft promotion");
   assert.ok(src.includes("--global"), "must teach scope choice");
   for (const unimplemented of ["mem pin", "mem useful", "mem useless", "memory_pin"]) {
@@ -37,7 +37,7 @@ test("previously skill teaches when to save and recall", () => {
 
 test("previously skill supplies the protected memory review workflow", () => {
   const src = fs.readFileSync(path.join(root, "skills", "previously", "SKILL.md"), "utf8");
-  for (const reference of ["PREVIOUSLY_SECURITY=1", "PREVIOUSLY_PYTHON", "previously scan", "previously review",
+  for (const reference of ["PREVIOUSLY_SECURITY=1", "PREVIOUSLY_PYTHON", "punk-records scan", "punk-records review",
     "no_signals", "suspicious", "incomplete", "pending", "false positive", "revoke", "docs/memory-security.md"]) {
     assert.ok(src.includes(reference), `must document security reference: ${reference}`);
   }

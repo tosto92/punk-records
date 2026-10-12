@@ -1,12 +1,12 @@
 {
-  "name": "previously-on-localhost",
-  "interface": { "displayName": "Previously on localhost" },
+  "name": "punk-records",
+  "interface": { "displayName": "Punk Records" },
   "plugins": [
     {
-      "name": "previously",
+      "name": "punk-records",
       "source": {
         "source": "url",
-        "url": "https://github.com/tosto92/previously-on-localhost.git",
+        "url": "https://github.com/tosto92/punk-records.git",
         "ref": "main"
       },
       "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },

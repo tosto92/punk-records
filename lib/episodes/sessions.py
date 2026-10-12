@@ -2,11 +2,11 @@
 """Episodes: SQLite index of past Claude Code, Codex + OpenCode sessions across all projects.
 
 usage:
-  previously episodes [filter] [-n N]            recent episodes with resume command
-  previously episodes timeline [filter] [-d D]   day -> project -> episodes, last D days (default 7)
-  previously episodes projects [filter]          one line per project: where you left off
-  previously episodes show <id-prefix>           every prompt of one episode
-  previously serve [--port n]                    web UI (memories + episodes) on http://127.0.0.1:4400/episodes
+  punk-records episodes [filter] [-n N]          recent episodes with resume command
+  punk-records episodes timeline [filter] [-d D] day -> project -> episodes, last D days (default 7)
+  punk-records episodes projects [filter]        one line per project: where you left off
+  punk-records episodes show <id-prefix>         every prompt of one episode
+  punk-records serve [--port n]                  web UI (memories + episodes) on http://127.0.0.1:4400/episodes
   sqlite3 ~/.local/share/previously/episodes.db  ad-hoc queries (tables: sessions, prompts; view: v)
 
 Every run syncs incrementally from ~/.claude, ~/.codex and OpenCode's opencode.db
@@ -250,7 +250,7 @@ def open_db():
 
 
 def api(path, query):
-    """JSON for the web UI (served by `previously graph --serve` at /episodes)."""
+    """JSON for the web UI (served by `punk-records serve` at /episodes)."""
     from urllib.parse import parse_qs
     q = {k: v[0] for k, v in parse_qs(query).items()}
     db = open_db()

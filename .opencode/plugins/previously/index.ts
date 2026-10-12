@@ -1,6 +1,6 @@
-// Previously on localhost opencode plugin: smart recall + automatic session capture.
+// Punk Records OpenCode plugin: smart recall + automatic session capture.
 // Capture writes ONE draft per session (type note, outcome open, tags [auto])
-// when the session goes idle — promoted later via `previously save --ref <slug>`.
+// when the session goes idle — promoted later via `punk-records save --ref <slug>`.
 // Same default export serves OpenCode V1 (`server`) and V2 (`setup`); the two
 // adapters share recall, save and capture from lib/, and never spawn the CLI
 // (the host may be a compiled Bun binary, not Node).
@@ -237,4 +237,4 @@ async function setup(ctx: any) {
   };
 }
 
-export default { id: "previously", server, setup };
+export default { id: "punk-records", server, setup };

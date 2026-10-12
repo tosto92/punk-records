@@ -1,17 +1,17 @@
 {
-  "name": "previously",
+  "name": "punk-records",
   "version": "0.1.0",
-  "description": "Session memory for coding agents: a recap of past sessions before every turn, cliffhanger drafts at turn end, and your past episodes.",
+  "description": "Punk Records: local session memory for coding agents.",
   "author": { "name": "Tommaso Tosi", "url": "https://github.com/tosto92" },
-  "homepage": "https://github.com/tosto92/previously-on-localhost",
-  "repository": "https://github.com/tosto92/previously-on-localhost",
+  "homepage": "https://github.com/tosto92/punk-records",
+  "repository": "https://github.com/tosto92/punk-records",
   "license": "MIT",
   "keywords": ["memory", "sessions", "recall", "mcp"],
   "hooks": "./hooks/claude.json",
   "mcpServers": {
     "previously": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/previously", "mcp"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/punk-records", "mcp"]
     }
   }
 }

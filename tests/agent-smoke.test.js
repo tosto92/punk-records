@@ -13,8 +13,8 @@ import {loadMemories} from '../lib/build.js';
 //   CLAUDE_BIN=$(which claude) CODEX_BIN=$(which codex) node --test tests/agent-smoke.test.js
 // Codex skips untrusted new hooks, so exec runs with --dangerously-bypass-hook-trust
 // (confined to the throwaway CODEX_HOME; docs/claude-codex-compatibility.md F5).
-const BIN = path.resolve(import.meta.dirname, '..', 'bin', 'previously');
-const PROMPT = 'If your context contains Previously on localhost, state the deploy codeword they mention. '
+const BIN = path.resolve(import.meta.dirname, '..', 'bin', 'punk-records');
+const PROMPT = 'If your context contains Punk Records, state the deploy codeword they mention. '
   + 'Then create a file named hello.txt containing the word hi using your file editing tool. Do nothing else.';
 
 async function run(binary, args, {cwd, env}, timeout = 300000) {

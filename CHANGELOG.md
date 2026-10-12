@@ -2,15 +2,16 @@
 
 ## 0.1.0 — unreleased
 
-First public release.
+First public release as Punk Records. The `previously` command remains an alias;
+existing memory stores and integration IDs remain compatible.
 
-- Recap: memories matching the prompt are injected before each turn
+- Recall: memories matching the prompt are injected before each turn
   (Claude Code, Codex, OpenCode).
-- Cliffhangers: an automatic draft at the end of each turn, listing the files
+- Automatic draft at the end of each turn, listing the files
   the session edited.
-- `previously save / ask / build / check / graph / migrate`, MCP server
+- `punk-records save / ask / build / check / graph / migrate`, MCP server
   (`memory_find`, `memory_save`, `memory_freshness`), skill and
   `/previously-save` command.
-- `previously episodes`: index of past Claude Code and Codex sessions with
+- `punk-records episodes`: index of past Claude Code and Codex sessions with
   resume commands, plus a local web page and skill.
-- Plugins for Claude Code and Codex; `previously init` for every agent.
+- Plugins for Claude Code and Codex; `punk-records init` for every agent.

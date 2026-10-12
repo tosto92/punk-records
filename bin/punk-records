@@ -1,0 +1,389 @@
+#!/usr/bin/env node
+import { resolveScopes, globalDir, repoDir } from "../lib/paths.js";
+import {saveMemory} from '../lib/save.js';
+import { buildAll } from "../lib/build.js";
+import { search, formatHits } from "../lib/ask.js";
+import { checkScope } from "../lib/check.js";
+import { serve } from "../lib/mcp.js";
+import { initRepo } from "../lib/init.js";
+import { writeGraph, serveGraph, openBrowser, } from "../lib/graph.js";
+import fs from 'node:fs';
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { migrateScope } from '../lib/migrate.js';
+import { handleHook } from "../lib/hook.js";
+import {runScan, runReview} from '../lib/security/cli.js';
+
+function usage() {
+  console.error(
+    "usage: punk-records save --type <t> --title <s> [--symptoms s] [--solution s] [--attempt a (repeatable)] [--files f (repeatable, comma-split)] [--tags a,b] [--ref slug] [--global|--local]",
+  );
+}
+
+function parseFlags(args) {
+  const out = {explicit: null};
+  let sawGlobal = false, sawLocal = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    const value = (flag) => {
+      const v = args[++i];
+      if (v === undefined || v.startsWith("--")) {
+        console.error(`punk-records: flag ${flag} requires a value`);
+        process.exit(2);
+      }
+      return v;
+    };
+    switch (a) {
+      case "--type": out.type = value(a); break;
+      case "--title": out.title = value(a); break;
+      case "--symptoms": out.symptoms = value(a); break;
+      case "--solution": out.solution = value(a); break;
+      case "--attempt": (out.attempts ??= []).push(value(a)); break;
+      case "--files": (out.files ??= []).push(...value(a).split(",").map((s) => s.trim()).filter(Boolean)); break;
+      case "--tags": (out.tags ??= []).push(...value(a).split(",").map((s) => s.trim()).filter(Boolean)); break;
+      case '--outcome': out.outcome = value(a); break;
+      case "--ref": out.ref = value(a); break;
+      case "--global": sawGlobal = true; out.explicit = "global"; break;
+      case "--local": sawLocal = true; out.explicit = "local"; break;
+      default:
+        console.error(`punk-records: unknown flag: ${a}`);
+        process.exit(2);
+    }
+    if (sawGlobal && sawLocal) {
+      console.error("punk-records: --global and --local are mutually exclusive");
+      process.exit(2);
+    }
+  }
+  return out;
+}
+
+function cmdSave(args) {
+  const flags = parseFlags(args);
+  if (!flags.ref && (!flags.type || !flags.title)) {
+    usage();
+    process.exit(2);
+  }
+  console.log(JSON.stringify(saveMemory(flags, {scope: flags.explicit === 'local' ? 'repo' : flags.explicit})));
+}
+
+function cmdBuild(args) {
+  const explicit = args.includes("--global") ? "global" : args.includes("--local") ? "local" : null;
+  const resolved = resolveScopes({ explicit }, process.cwd());
+  try {
+    buildAll(resolved, explicit);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(2);
+  }
+}
+
+function cmdAsk(args) {
+  let query = null;
+  let limit = 5;
+  let scope = "all";
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--limit") limit = Number(args[++i]);
+    else if (a === "--scope") scope = args[++i];
+    else if (a.startsWith("--")) {
+      console.error(`punk-records: unknown flag: ${a}`);
+      process.exit(2);
+    } else if (query === null) query = a;
+    else {
+      console.error("punk-records: unexpected extra argument");
+      process.exit(2);
+    }
+  }
+  if (!query || !Number.isInteger(limit) || limit < 1) {
+    console.error('usage: punk-records ask "<q>" [--limit 5] [--scope global|local|all]');
+    process.exit(2);
+  }
+  if (!["global", "local", "all"].includes(scope)) {
+    console.error(`punk-records: invalid --scope: ${scope}`);
+    process.exit(2);
+  }
+  const explicit = scope === "global" ? "global" : scope === "local" ? "local" : null;
+  let resolved;
+  try {
+    resolved = resolveScopes({ explicit }, process.cwd());
+  } catch (err) {
+    console.error(err.message);
+    process.exit(2);
+  }
+  const hits = search({ query, limit, scope, resolved });
+  if (hits.length) console.log(formatHits(hits));
+}
+
+function cmdCheck(args) {
+  const explicit = args.includes("--global") ? "global" : args.includes("--local") ? "local" : null;
+  for (const a of args) {
+    if (a !== "--global" && a !== "--local") {
+      console.error(`punk-records: unknown flag: ${a}`);
+      process.exit(2);
+    }
+  }
+  const resolved = resolveScopes({ explicit }, process.cwd());
+  let writes;
+  if (explicit === "global") {
+    writes = ["global"];
+  } else if (explicit === "local") {
+    if (!resolved.repoRoot) {
+      console.error("punk-records: --local requested outside a project (git repo or .previously; run punk-records init --local)");
+      process.exit(2);
+    }
+    writes = ["local"];
+  } else {
+    writes = ["global"];
+    if (resolved.repoRoot) writes.push("local");
+  }
+  let stale = false;
+  for (const w of writes) {
+    const dir = w === "global" ? globalDir() : repoDir(resolved.repoRoot);
+    const res = checkScope(dir);
+    if (res.stale) {
+      stale = true;
+      for (const rel of res.drift) console.log(`stale: ${rel}`);
+    }
+  }
+  process.exit(stale ? 1 : 0);
+}
+
+const HELP = `Punk Records — session memory for coding agents (Claude Code, Codex, OpenCode)
+
+usage: punk-records <command> [flags]
+
+  init [--global|--local] [--agents opencode,claude,codex] [--opencode-api v1|v2] [--dry-run]
+                     wire hooks, MCP server and skill (repo, or every repo with --global)
+  ask <query> [--limit n] [--scope local|global|all]
+                     recall memories matching symptoms, errors or file names
+  save --type <solved|attempt_failed|decision|note> --title <s> [--symptoms s] [--solution s]
+       [--attempt a]... [--files f]... [--tags a,b] [--ref slug] [--global|--local]
+                     save a memory (or update one with --ref)
+  serve [--open] [--port n] [--scope ...]
+                     web UI: memories (/) and episodes (/episodes); same flags as graph
+  graph [--serve] [--open] [--port n] [--scope local|global|all] [--all-projects] [--no-drafts] [--out file]
+                     browse memories in a local web viewer
+  build              regenerate the derived Markdown index
+  check              report files whose memories may be stale
+  scan [--local|--global] [--rules directory]
+                     report NOVA signals and incomplete scans as JSON
+  review [--local|--global]
+                     review false positives in an interactive terminal
+  migrate [--apply]  upgrade old event logs
+  episodes [timeline|projects|show <id>|serve] [filter] [-n N] [-d D]
+                     past Claude Code / Codex sessions and how to resume them (needs python3)
+  mcp                run the MCP server (stdio)
+  hook <agent> <event>
+                     agent hook entry point (installed by init)
+
+  -h, --help         show this help
+  -v, --version      show the version`;
+
+const [major, minor] = process.versions.node.split(".").map(Number);
+if (major < 20 || (major === 20 && minor < 11)) {
+  console.error(`punk-records: Node.js >= 20.11 required (found ${process.versions.node})`);
+  process.exit(2);
+}
+
+const argv = process.argv.slice(2);
+// `serve` = the web UI (memories + episodes), i.e. `graph --serve`
+if (argv[0] === "serve") argv.splice(0, 1, "graph", "--serve");
+const [sub, ...rest] = argv;
+switch (sub) {
+  case "-h":
+  case "--help":
+  case "help":
+    console.log(HELP);
+    break;
+  case "-v":
+  case "--version": {
+    const pkg = new URL("../package.json", import.meta.url);
+    console.log(JSON.parse(fs.readFileSync(pkg, "utf8")).version);
+    break;
+  }
+  case 'migrate': {
+    try {
+      let explicit = null, apply = false, dryRun = false, expectedSource = null, refs = {};
+      for (let i = 0; i < rest.length; i++) {
+        const arg = rest[i];
+        if (arg === '--global' || arg === '--local') {
+          const next = arg.slice(2);
+          if (explicit && explicit !== next) throw new TypeError('scope flags are mutually exclusive');
+          explicit = next;
+        } else if (arg === '--apply') apply = true;
+        else if (arg === '--dry-run') dryRun = true;
+        else if (arg === '--expected-source' || arg === '--refs') {
+          const value = rest[++i];
+          if (!value || value.startsWith('--')) throw new TypeError(`${arg} requires a value`);
+          if (arg === '--expected-source') expectedSource = value;
+          else refs = JSON.parse(fs.readFileSync(value, 'utf8'));
+        } else throw new TypeError(`unknown flag: ${arg}`);
+      }
+      if (apply && dryRun) throw new TypeError('--apply and --dry-run are mutually exclusive');
+      const resolved = resolveScopes({explicit});
+      if (resolved.writes[0] === 'local' && !resolved.repoRoot) throw new TypeError('local scope requested outside a project (git repo or .previously; run punk-records init --local)');
+      const dir = resolved.writes[0] === 'local' ? repoDir(resolved.repoRoot) : globalDir();
+      console.log(JSON.stringify(migrateScope(dir, {apply, expectedSource, refs}), null, 2));
+    } catch (err) { console.error(`punk-records: ${err.message}`); process.exit(2); }
+    break;
+  }
+  case "save":
+    try { cmdSave(rest); }
+    catch (err) { console.error(`punk-records: ${err.message}`); process.exit(2); }
+    break;
+  case "build":
+    cmdBuild(rest);
+    break;
+  case "check":
+    cmdCheck(rest);
+    break;
+  case 'scan':
+    process.exitCode = runScan(rest);
+    break;
+  case 'review':
+    process.exitCode = await runReview(rest);
+    break;
+  case "ask":
+    cmdAsk(rest);
+    break;
+  case "graph": {
+    let scope = "all";
+    let out = null;
+    let port = 4400;
+    let serve = false;
+    let open = false;
+    let viewer = "auto";
+    let drafts = true;
+    for (let i = 0; i < rest.length; i++) {
+      if (rest[i] === "--scope") scope = rest[++i];
+      else if (rest[i] === "--out") out = rest[++i];
+      else if (rest[i] === "--port") port = Number(rest[++i]);
+      else if (rest[i] === "--viewer") viewer = rest[++i];
+      else if (rest[i] === "--serve") serve = true;
+      else if (rest[i] === "--open") open = true;
+      else if (rest[i] === "--no-drafts") drafts = false;
+      else if (rest[i] === "--global") scope = "global";
+      else if (rest[i] === "--local") scope = "local";
+      else if (rest[i] === "--all-projects") scope = "projects";
+      else {
+        console.error(`punk-records: unknown flag: ${rest[i]}`);
+        process.exit(2);
+      }
+    }
+    if (!["global", "local", "all", "projects"].includes(scope)) {
+      console.error(`punk-records: invalid --scope: ${scope}`);
+      process.exit(2);
+    }
+    if (!["auto", "svg"].includes(viewer)) {
+      console.error(`punk-records: invalid --viewer: ${viewer} (auto|svg)`);
+      process.exit(2);
+    }
+    const resolved = resolveScopes({explicit: scope === 'all' || scope === 'projects' ? null : scope === 'global' ? 'global' : 'local'});
+    try {
+      if (serve) {
+        if (!Number.isInteger(port) || port < 0 || port > 65535) {
+          console.error(`punk-records: invalid --port: ${rest[rest.indexOf('--port') + 1]}`);
+          process.exit(2);
+        }
+        const {url, close, viewer: used} = await serveGraph(resolved, {scope, port, open, viewer, drafts});
+        console.log(`${url} (${used} viewer)`);
+        for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => close().then(() => process.exit(0)));
+      } else {
+        const {wrote, memories} = writeGraph(resolved, {scope, out, drafts});
+        console.log(`${wrote} (${memories} memories)`);
+        if (open) openBrowser(`file://${wrote}`);
+      }
+    } catch (err) {
+      console.error(`punk-records: ${err.message}`);
+      process.exit(2);
+    }
+    break;
+  }
+  case "mcp": {
+    const explicit = rest.includes("--global") ? "global" : rest.includes("--local") ? "local" : null;
+    for (const a of rest) {
+      if (a !== "--global" && a !== "--local") {
+        console.error(`punk-records: unknown flag: ${a}`);
+        process.exit(2);
+      }
+    }
+    serve({ flagExplicit: explicit, cwd: process.cwd() });
+    break;
+  }
+  case "init": {
+    const dryRun = rest.includes("--dry-run");
+    const explicit = rest.includes("--global") ? "global" : rest.includes("--local") ? "local" : null;
+    const valued = ["--opencode-api", "--agents"];
+    const valueAt = new Set(valued.map((f) => rest.indexOf(f)).filter((i) => i !== -1).map((i) => i + 1));
+    const valueOf = (flag) => (rest.includes(flag) ? rest[rest.indexOf(flag) + 1] : null);
+    for (const [i, a] of rest.entries()) {
+      if (valueAt.has(i)) continue;
+      if (a !== "--dry-run" && a !== "--global" && a !== "--local" && !valued.includes(a)) {
+        console.error(`punk-records: unknown flag: ${a}`);
+        process.exit(2);
+      }
+    }
+    const opencodeApi = valueOf("--opencode-api") ?? "v1";
+    if (opencodeApi !== "v1" && opencodeApi !== "v2") {
+      console.error(`punk-records: --opencode-api must be v1 or v2 (got ${opencodeApi})`);
+      process.exit(2);
+    }
+    const agentsArg = valueOf("--agents");
+    if (agentsArg !== null && (agentsArg === undefined || agentsArg.startsWith("--"))) {
+      console.error("punk-records: --agents requires a value (opencode,claude,codex)");
+      process.exit(2);
+    }
+    const agents = agentsArg === null ? undefined : agentsArg.split(",").map((s) => s.trim()).filter(Boolean);
+    let touched;
+    try {
+      ({ touched } = initRepo({ cwd: process.cwd(), dryRun, explicit, opencodeApi, agents }));
+    } catch (err) {
+      console.error(err.message);
+      process.exit(2);
+    }
+    for (const t of touched) console.log(t);
+    break;
+  }
+  case "episodes": {
+    // ponytail: one web UI; the episodes page lives on the graph server
+    if (rest[0] === "serve") {
+      const port = Number(rest[1] ?? 4400);
+      if (!Number.isInteger(port) || port < 0 || port > 65535) {
+        console.error(`punk-records: invalid port: ${rest[1]}`);
+        process.exit(2);
+      }
+      const {url, close} = await serveGraph(resolveScopes({explicit: null}), {scope: "all", port});
+      console.log(`${url}/episodes`);
+      for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => close().then(() => process.exit(0)));
+      break;
+    }
+    const script = fileURLToPath(new URL("../lib/episodes/sessions.py", import.meta.url));
+    const python = process.env.PREVIOUSLY_PYTHON || "python3";
+    const res = spawnSync(python, [script, ...rest], { stdio: "inherit" });
+    if (res.error) {
+      console.error(`punk-records: episodes needs Python 3.9+ (${python}: ${res.error.code ?? res.error.message})`);
+      process.exit(2);
+    }
+    process.exit(res.status ?? 1);
+  }
+  case "hook": {
+    // Agent hooks must never block or fail the session: always exit 0.
+    const [agent, event] = rest;
+    try {
+      let input = null;
+      try { input = JSON.parse(fs.readFileSync(0, "utf8")); } catch { /* not JSON: no-op */ }
+      const out = await handleHook(agent, event, input);
+      if (out) process.stdout.write(JSON.stringify(out) + "\n");
+    } catch (err) {
+      console.error(`punk-records: ${err.message}`);
+    }
+    process.exitCode = 0;
+    break;
+  }
+  case undefined:
+    console.error(HELP);
+    process.exit(2);
+  default:
+    console.error(`punk-records: unknown command '${sub}' (see punk-records --help)`);
+    process.exit(2);
+}
