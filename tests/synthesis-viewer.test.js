@@ -145,8 +145,23 @@ test('current previous summary is bound to canonical preparation, including lega
   assert.equal(synthesisReview(r).request.groups[0].previousSummaryUnavailable, false);
   assert.equal(synthesisReview(r).publishError, null);
   prepareSynthesis(f);
-  assert.equal(synthesisReview(r).request.groups[0].previousSummary, first.response.summaries[0].summary);
+  assert.equal(synthesisReview(r).request.groups[0].previousSummary, null);
+  assert.equal(synthesisReview(r).request.groups[0].previousSummaryUnavailable, true);
   const newer = run(f, prepareSynthesis(f)); publishSynthesisRun(newer);
   const historical = synthesisReview(r).request.groups[0];
   assert.equal(historical.previousSummary, null); assert.equal(historical.previousSummaryUnavailable, true);
+});
+
+test('published historical comparison withholds both honest capture A and forgery matching new card B', t => {
+  const f = fixture(t), first = run(f);
+  first.response.summaries[0].summary = 'Summary A: keep daily backups.';
+  applySynthesis({...f, response: first.response});
+  fs.writeFileSync(f.file, 'native version two'); const r = run(f, prepareSynthesis(f));
+  assert.equal(synthesisReview(r).request.groups[0].previousSummary, first.response.summaries[0].summary);
+  publishSynthesisRun(r);
+  const honest = synthesisReview(r); assert.equal(honest.request.groups[0].previousSummary, null); assert.equal(honest.request.groups[0].previousSummaryUnavailable, true);
+  const forged = structuredClone(r.request); forged.groups[0].previousSummary = r.response.summaries[0].summary;
+  fs.writeFileSync(path.join(r.dir, 'request.json'), JSON.stringify(forged));
+  const view = synthesisReview(r); assert.equal(view.request.groups[0].previousSummary, null); assert.equal(view.request.groups[0].previousSummaryUnavailable, true);
+  assert.equal(view.published, true); assert.ok(view.publishError); assert.throws(() => publishSynthesisRun({...r, reviewId: view.reviewId}));
 });
