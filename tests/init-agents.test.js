@@ -37,6 +37,45 @@ function sandbox(t) {
 }
 const commandsOf = (config, event) => (config.hooks?.[event] ?? []).flatMap((g) => g.hooks.map((h) => h.command));
 
+test('synthesis skills and compatibility links resolve for every agent', t => {
+  const {repo,home,root} = sandbox(t);
+  initRepo({cwd:repo});
+  initRepo({cwd:repo,explicit:'global'});
+  const bases = [path.join(repo,'.claude','skills'),path.join(repo,'.agents','skills'),path.join(root,'oc-skills'),path.join(home,'.claude','skills'),path.join(home,'.codex','skills')];
+  for (const base of bases) for (const name of ['punk-records-synthesize','brainbrain','brainbrain-synthesize']) {
+    assert.equal(fs.realpathSync(path.join(base,name)),path.join(ROOT,'skills',name));
+    assert.match(fs.readFileSync(path.join(base,name,'SKILL.md'),'utf8'),new RegExp(`name: ${name}\\n`));
+  }
+  for (const name of ['punk-records-synthesize','brainbrain','brainbrain-synthesize']) assert.equal(fs.realpathSync(path.join(home,'.local','bin',name)),path.join(ROOT,'bin',name));
+});
+
+for (const name of ['punk-records','previously']) for (const environment of ['env = { PUNK_RECORDS_SYNTHESIS = "1", PUNK_RECORDS_SECURITY = "1", EXTRA = "literal $&" }',`[mcp_servers.${name}.env]\nPUNK_RECORDS_SYNTHESIS = "1"\nPUNK_RECORDS_SECURITY = "1"\nEXTRA = "literal $&"`]) {
+  test(`Codex init preserves ${name} managed environment ${environment.startsWith('env') ? 'inline' : 'table'} and custom fields`, t => {
+    const {repo} = sandbox(t), config = path.join(repo,'.codex','config.toml');
+    fs.mkdirSync(path.dirname(config));
+    fs.writeFileSync(config,`model = "keep"\n# ${name}:start\n[mcp_servers.${name}]\ncommand = "node"\nargs = ["/old/bin/${name}", "mcp"]\nstartup_timeout_sec = 20\n${environment}\n# ${name}:end\n`);
+    initRepo({cwd:repo,agents:['codex']});
+    const result = fs.readFileSync(config,'utf8');
+    assert.match(result,/model = "keep"/); assert.match(result,/startup_timeout_sec = 20/);
+    assert.match(result,/PUNK_RECORDS_SYNTHESIS = "1"/); assert.match(result,/PUNK_RECORDS_SECURITY = "1"/);
+    assert.ok(result.includes('EXTRA = "literal $&"'));
+    assert.ok(result.includes(JSON.stringify(BIN))); assert.doesNotMatch(result,/mcp_servers\.previously|# previously:/);
+    assert.equal(initRepo({cwd:repo,agents:['codex']}).touched.includes('.codex/config.toml'),false);
+    assert.equal(fs.existsSync(path.join(repo,'.agents','skills','punk-records-synthesize','SKILL.md')),true);
+  });
+}
+
+test('Codex init preserves unfamiliar managed TOML with warning while installing skills', t => {
+  const {repo} = sandbox(t), config = path.join(repo,'.codex','config.toml');
+  fs.mkdirSync(path.dirname(config));
+  const original = '# punk-records:start\n[mcp_servers.punk-records]\ncommand = "custom-wrapper"\nargs = ["--custom"]\nenv = { PUNK_RECORDS_SECURITY = "1" }\n# punk-records:end\n';
+  fs.writeFileSync(config,original);
+  const warnings=[]; t.mock.method(console,'error',line=>warnings.push(line));
+  initRepo({cwd:repo,agents:['codex']});
+  assert.equal(fs.readFileSync(config,'utf8'),original); assert.ok(warnings.some(line=>/managed.*left alone/.test(line)));
+  assert.equal(fs.existsSync(path.join(repo,'.agents','skills','punk-records-synthesize','SKILL.md')),true);
+});
+
 test("repo init wires Claude Code: MCP, hooks, CLAUDE.md, skill, command", (t) => {
   const { repo, read } = sandbox(t);
   initRepo({ cwd: repo, agents: ["claude"] });

@@ -5,6 +5,9 @@
   "type": "module",
   "bin": {
     "punk-records": "bin/punk-records",
+    "punk-records-synthesize": "bin/punk-records-synthesize",
+    "brainbrain": "bin/brainbrain",
+    "brainbrain-synthesize": "bin/brainbrain-synthesize",
     "previously": "bin/previously"
   },
   "files": [

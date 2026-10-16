@@ -15,7 +15,7 @@ recalls them when they matter in **Claude Code**, **Codex** and **OpenCode**.
 - Everything stays on your machine: no network access, no telemetry.
 - Plain files: an append-only `events.jsonl` you can read, grep and commit.
 
-Optional [incremental synthesis](docs/synthesis.md) combines explicit Punk/native Markdown sources through a manual agent workflow. Recall remains opt-in with `PUNK_RECORDS_SYNTHESIS=1`; originals stay available.
+Optional [incremental synthesis](docs/synthesis.md) combines explicit Punk/native Markdown sources through a dedicated skill and bounded agent runner. Review drafts before publishing, or explicitly enable unattended apply. Recall remains opt-in with `PUNK_RECORDS_SYNTHESIS=1`; originals stay available.
 
 ```mermaid
 flowchart LR

@@ -41,3 +41,37 @@ State lives in a separate private `synthesis.json`, published by atomic rename u
 State and response input must be regular UTF-8 JSON files: state reads/writes are limited to 64 MiB and response inputs to 8 MiB. Oversized or non-regular files are rejected before reading; rejected publication preserves the previous state.
 
 With `PUNK_RECORDS_SECURITY=1`, prepare/apply and recall use the existing scanner. A summary requires admission of its own content and every exact current source version. Source deletion, changes, refusal and approval revocation invalidate it. Native and summary records cannot currently be resolved by the interactive review command; suspicious virtual records therefore remain excluded. Ordinary Punk sources retain the existing review workflow. Scanner availability and scanner size/batch limits still apply.
+
+## Bounded agent jobs
+
+The `punk-records-synthesize` skill supports first-time grouping, synthesis in the current agent session, and reviewed refreshes. Install it with the normal `punk-records init` workflow or the agent plugin. Register explicit source groups using `synth prepare` before the first refresh; new files and new memories are not automatically added.
+
+The runner checks for changed groups before launching an external agent:
+
+```sh
+punk-records-synthesize --global -- /absolute/path/agent-adapter
+```
+
+The adapter is an executable, followed by separate arguments after `--`; the runner never interprets a shell command string. It receives the canonical skill instructions plus the prepared request on stdin. It must emit exactly the response JSON shown above on stdout, with diagnostics on stderr. A wrapper is needed if the provider emits a JSON envelope or streaming events instead of the raw response. Authentication and provider selection belong to that executable.
+
+For example, with a Claude Code version supporting these flags and authentication already configured:
+
+```sh
+punk-records-synthesize --global -- claude -p --output-format text --tools "" --strict-mcp-config --no-session-persistence --restricted
+```
+
+The example disables Claude tools and configured MCP servers and avoids persistent session files. The runner itself is not a sandbox: a supplied executable retains the operating-system access of the user running it. Choose an appropriately restricted agent command. Punk autosave is disabled in the child environment to avoid recording synthesis work as independent source evidence.
+
+Without `--apply`, a successful run returns `review_required`, leaving published summaries unchanged. Review the private response artifact and then publish:
+
+```sh
+punk-records synth apply --global --input /absolute/path/from-report/response.json
+```
+
+After authorizing unattended publication, add `--apply` before `--` to validate and publish in the same job. `--group NAME` selects one registered group; omitted means all configured dirty groups. `--local` selects the current project, and the default scope follows `save`. `punk-records synth run` is equivalent to the standalone runner.
+
+An unchanged store returns `noop` without starting the agent. This avoids model-generation costs; invoking a skill inside an already running agent still uses that agent's context. Dirty groups contain all current source content, not just changed lines.
+
+Each run is limited to 512 KiB of prompt input and 8 MiB of stdout; at most 64 KiB of stderr is retained. The agent wall-time limit defaults to 300 seconds; `--timeout SECONDS` accepts 1–3600. Timeout and descendant cleanup are enforced on POSIX (including WSL). On native Windows, only the direct child is terminated; descendants may survive and delay runner completion. Preparation and validation retain the existing scanner limits and are outside that agent timeout. The runner makes one attempt and never retries automatically. Its report includes status, group names, elapsed time, byte counts and artifact paths; `usage: null` means provider token metering is unavailable, not zero tokens.
+
+Artifacts are private files under the selected store's `synthesis-runs/<run-id>/`: request, response when available, diagnostics and report. They contain source content and are retained for review; handle and delete them accordingly. A per-store `synthesis-job.lock` excludes overlapping runner jobs throughout the attempt. A manual `prepare` can still supersede its pending request, causing validation/apply to reject the old output. For an abandoned lock, first confirm that no job or child process remains active. Keep periodic scheduling separate until the manual runs are satisfactory.

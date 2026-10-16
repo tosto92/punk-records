@@ -171,7 +171,7 @@ usage: punk-records <command> [flags]
                      report NOVA signals and incomplete scans as JSON
   review [--local|--global]
                      review false positives in an interactive terminal
-  synth prepare|apply|status|remove [--global|--local]
+  synth prepare|apply|status|remove|run [--global|--local]
                      manual incremental synthesis (see docs/synthesis.md)
   migrate [--apply]  upgrade old event logs
   episodes [timeline|projects|show <id>|serve] [filter] [-n N] [-d D]
@@ -195,7 +195,11 @@ if (argv[0] === "serve") argv.splice(0, 1, "graph", "--serve");
 const [sub, ...rest] = argv;
 switch (sub) {
   case 'synth':
-    try { console.log(JSON.stringify(runSynthesis(rest), null, 2)); }
+    try {
+      const result = await runSynthesis(rest);
+      console.log(JSON.stringify(result, null, 2));
+      if (result.status === 'error') process.exitCode = 2;
+    }
     catch (err) { console.error(`punk-records: ${err.message}`); process.exit(2); }
     break;
   case "-h":

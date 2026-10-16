@@ -20,6 +20,7 @@ test('plugin manifests agree with package.json and point at files that exist', (
     assert.equal(m.license, pkg.license);
   }
   for (const rel of [claude.hooks, codex.hooks, codex.skills, 'skills/punk-records/SKILL.md',
+    'skills/punk-records-synthesize/SKILL.md', 'skills/brainbrain/SKILL.md', 'skills/brainbrain-synthesize/SKILL.md',
     'skills/punk-records-episodes/SKILL.md', 'commands/punk-records-save.md', 'skills/previously/SKILL.md',
     'skills/previously-episodes/SKILL.md', 'commands/previously-save.md']) {
     assert.ok(fs.existsSync(path.join(ROOT, rel)), rel);

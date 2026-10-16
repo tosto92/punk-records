@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+import {runSynthesisCommand} from '../lib/synthesis-runner.js';
+
+const args = process.argv.slice(2), separator = args.indexOf('--');
+if ((separator < 0 ? args : args.slice(0, separator)).includes('--help')) {
+  console.log('usage: punk-records-synthesize [--global|--local] [--group NAME] [--apply] [--timeout SECONDS] -- EXECUTABLE [ARG ...]\nValidate a synthesis draft for review; --apply publishes it. Agent reads prompt on stdin and returns response JSON on stdout.');
+} else {
+  try {
+    const report = await runSynthesisCommand(args);
+    console.log(JSON.stringify(report));
+    if (report.status === 'error') process.exitCode = 2;
+  } catch (err) {
+    console.log(JSON.stringify({status: 'error', groups: [], durationMs: 0, inputBytes: 0, outputBytes: 0, usage: null, paths: {}, errors: [err.message]}));
+    process.exitCode = 2;
+  }
+}
