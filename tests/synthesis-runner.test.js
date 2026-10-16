@@ -9,7 +9,7 @@ import {runSynthesisJob} from '../lib/synthesis-runner.js';
 import {securityFixture} from './helpers/security.js';
 
 function fixture(t, register = true) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'synth-runner-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'synth-runner-')));
   t.after(() => fs.rmSync(root, {recursive: true, force: true}));
   const store = path.join(root, 'store'), file = path.join(root, 'source.md');
   fs.writeFileSync(file, 'deploy source facts');
