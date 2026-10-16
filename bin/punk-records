@@ -172,7 +172,7 @@ usage: punk-records <command> [flags]
   review [--local|--global]
                      review false positives in an interactive terminal
   synth prepare|apply|status|remove|run [--global|--local]
-                     manual incremental synthesis (see docs/synthesis.md)
+                     manual synthesis; status --request-id ID checks publication (see docs/synthesis.md)
   migrate [--apply]  upgrade old event logs
   episodes [timeline|projects|show <id>|serve] [filter] [-n N] [-d D]
                      past Claude Code / Codex sessions and how to resume them (needs python3)
@@ -190,7 +190,7 @@ if (major < 20 || (major === 20 && minor < 11)) {
 }
 
 const argv = process.argv.slice(2);
-// `serve` = the web UI (memories + episodes), i.e. `graph --serve`
+// `serve` = the web UI (memories + episodes + synthesis), i.e. `graph --serve`
 if (argv[0] === "serve") argv.splice(0, 1, "graph", "--serve");
 const [sub, ...rest] = argv;
 switch (sub) {

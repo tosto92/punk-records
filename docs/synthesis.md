@@ -75,3 +75,21 @@ An unchanged store returns `noop` without starting the agent. This avoids model-
 Each run is limited to 512 KiB of prompt input and 8 MiB of stdout; at most 64 KiB of stderr is retained. The agent wall-time limit defaults to 300 seconds; `--timeout SECONDS` accepts 1–3600. Timeout and descendant cleanup are enforced on POSIX (including WSL). On native Windows, only the direct child is terminated; descendants may survive and delay runner completion. Preparation and validation retain the existing scanner limits and are outside that agent timeout. The runner makes one attempt and never retries automatically. Its report includes status, group names, elapsed time, byte counts and artifact paths; `usage: null` means provider token metering is unavailable, not zero tokens.
 
 Artifacts are private files under the selected store's `synthesis-runs/<run-id>/`: request, response when available, diagnostics and report. They contain source content and are retained for review; handle and delete them accordingly. A per-store `synthesis-job.lock` excludes overlapping runner jobs throughout the attempt. A manual `prepare` can still supersede its pending request, causing validation/apply to reject the old output. For an abandoned lock, first confirm that no job or child process remains active. Keep periodic scheduling separate until the manual runs are satisfactory.
+
+## Review in the local viewer
+
+Run `punk-records serve --open`, then choose **Synthesis** alongside Memories and Episodes. Its scope follows `serve --scope local|global|all` or `--all-projects`; projects come only from the existing registry. Configured groups and their explicit sources are listed before any run. Select a saved run to compare the draft with captured source text and the previous summary supplied to that run. This is captured evidence, not a live preview of edited files. Native Markdown and Punk Records sources retain their provenance.
+
+**Publish entire request** publishes all groups in that saved request through the same validation and atomic apply used by the CLI. It requires explicit confirmation. Changed sources, a replaced pending request, a replaced reviewed draft, missing or blocked evidence, and already consumed requests refuse publication. Refresh and prepare/run again as appropriate. Original memories and native files are never rewritten. The page does not launch an agent, edit groups, or configure scheduling.
+
+The viewer shows recorded input/output bytes, elapsed milliseconds and runner errors. These are operational measurements, not measured tokens or semantic coverage. Invalid JSON output is withheld while its admitted request and report can still be inspected. Historical evidence is screened with the current security settings and decisions; evidence whose source registration has been removed is withheld. Each artifact and the captured source evidence are bounded to 8 MiB; the newest 100 runs are shown, with directory enumeration limited to 1000 entries. Symlinks and paths supplied by the browser are refused.
+
+Publication records the request ID in the same atomic state update as the summaries. A scheduler can check completion independently of later source edits, new prepares, new publications, or group removal:
+
+```sh
+punk-records synth status --local --request-id REQUEST_UUID
+```
+
+The additional `published` boolean means that exact request was published. The latest 100 publication receipts are retained; older requests and publications predating receipts return false. This conservative limit avoids growing state indefinitely. Group status still describes current freshness and must not be used as a request publication receipt.
+
+The publication API is restricted to the bound loopback host and same origin, with a per-server CSRF token, POST-only bounded JSON, and scoped run identifiers. Artifact content is displayed as text. This local interface assumes the operating-system user and configured stores are trusted; it is not a multi-user service.
