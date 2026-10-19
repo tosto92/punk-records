@@ -34,6 +34,39 @@ test('MCP validates envelopes before treating them as notifications', () => {
   assert.ok(handleMessage({jsonrpc: '2.0', id: null, method: 'tools/list'}, ctx).result.tools);
 });
 
+// Vertex AI (e Gemini via tool calling) rifiuta l'intera richiesta se uno schema di
+// funzione contiene any_of/one_of accanto ad altre chiavi: "parameters.files schema
+// specified other fields alongside any_of". Il trigger e' un type union JSON Schema
+// (`type: ["array","string"]`), che i converter traducono in any_of + items fratelli.
+// Qui imponiamo che i tool restino traducibili: type singolo, niente anyOf/oneOf.
+function assertVertexSafeSchema(schema, where) {
+  assert.ok(schema && typeof schema === 'object', `${where}: schema must be an object`);
+  assert.equal(schema.anyOf, undefined, `${where}: anyOf is not Vertex-safe`);
+  assert.equal(schema.oneOf, undefined, `${where}: oneOf is not Vertex-safe`);
+  assert.equal(schema.allOf, undefined, `${where}: allOf is not Vertex-safe`);
+  if (schema.type !== undefined) {
+    assert.equal(typeof schema.type, 'string', `${where}: type must be a single string`);
+  }
+  for (const key of ['properties', 'patternProperties', 'definitions', '$defs']) {
+    for (const [name, child] of Object.entries(schema[key] || {})) {
+      assertVertexSafeSchema(child, `${where}.${key}.${name}`);
+    }
+  }
+  if (schema.items) assertVertexSafeSchema(schema.items, `${where}.items`);
+  if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+    assertVertexSafeSchema(schema.additionalProperties, `${where}.additionalProperties`);
+  }
+}
+
+test('tools/list schemas are Vertex-safe (no type unions / anyOf)', () => {
+  const res = handleMessage({jsonrpc: '2.0', id: 1, method: 'tools/list'}, {cwd: ROOT, flagExplicit: null});
+  const tools = res.result.tools;
+  assert.ok(tools.length >= 3);
+  for (const tool of tools) {
+    assertVertexSafeSchema(tool.inputSchema, tool.name);
+  }
+});
+
 test('MCP continues on the same process after malformed JSON and invalid envelopes', () => {
   const messages = [null, 1, [], {}, {jsonrpc: '2.0', method: 'notifications/initialized'},
     {jsonrpc: '2.0', id: 'after-invalid', method: 'tools/list'}];
