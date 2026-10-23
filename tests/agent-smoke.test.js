@@ -8,6 +8,7 @@ import {initRepo, CODEX_PROJECT_HOOKS} from '../lib/init.js';
 import {RECALL_OUTPUT} from '../lib/hook.js';
 import {saveMemory} from '../lib/save.js';
 import {loadMemories} from '../lib/build.js';
+import {INSTALLATIONS, configuration, evaluateCase} from './helpers/agent-evaluation.js';
 
 // Opt-in: real CLIs with real credentials copied into throwaway config dirs.
 //   CLAUDE_BIN=$(which claude) CODEX_BIN=$(which codex) node --test tests/agent-smoke.test.js
@@ -64,7 +65,7 @@ function transcriptsContain(dir, needle) {
 }
 
 test('Claude Code: repo hooks recall the seeded memory and save a draft for hello.txt',
-  {skip: !process.env.CLAUDE_BIN && 'CLAUDE_BIN not set', timeout: 600000}, async t => {
+  {skip: process.env.PUNK_RECORDS_EVAL === '1' ? 'legacy capture excluded from exact evaluation count' : !process.env.CLAUDE_BIN && 'CLAUDE_BIN not set', timeout: 600000}, async t => {
     const {root, cwd, env} = project(t);
     env.CLAUDE_CONFIG_DIR = path.join(root, 'claude-config');
     fs.mkdirSync(env.CLAUDE_CONFIG_DIR);
@@ -77,6 +78,23 @@ test('Claude Code: repo hooks recall the seeded memory and save a draft for hell
     assert.equal(drafts.length, 1);
     assert.match(drafts[0].title, /^Claude Code session /);
     assert.ok(drafts[0].files.includes('hello.txt'), JSON.stringify(drafts[0].files));
+  });
+
+test('Claude lifecycle delivery: startup and actual session resume for each installation',
+  {skip: process.env.PUNK_RECORDS_EVAL !== '1' && 'PUNK_RECORDS_EVAL=1 required', timeout: 3600000}, async t => {
+    const config = configuration();
+    for (const installation of INSTALLATIONS) {
+      for (const caseId of ['startup', 'delivery-resume']) {
+        await t.test(`${installation}/${caseId}`, async () => {
+          const record = await evaluateCase({...config, installation, caseId, attempt: 1});
+          assert.equal(record.status, 'evaluated', record.failure);
+          if (!record.delivery.baselineAbsenceExpected) {
+            assert.equal(record.delivery.pass, true, 'actual host source and matching hook output required; transcript ingestion separately unverified');
+          }
+          t.diagnostic(`transcript ingestion: ${record.delivery.transcriptReceipt}; compact/clear live unverified`);
+        });
+      }
+    }
   });
 
 test('Codex: hooks recall the seeded memory and save a draft for hello.txt',
