@@ -106,9 +106,15 @@ To update instead of creating a memory, pass `--ref <slug|memoryId>` and leave o
 
 ## Drafts
 
-Every agent session auto-saves one draft (`tags: [auto]`, `outcome: open`) listing
-the files it wrote, titled `<Agent> session <id>` where Agent is `OpenCode`,
-`Claude Code` or `Codex`. Drafts are excluded from automatic recall but remain searchable explicitly. Promote a good draft into a real memory instead of writing from scratch.
+When autosave is enabled and a supported hook observes successful file edits, it
+may save an activity draft (`tags: [auto]`, `outcome: open`) listing those edits.
+Sessions without recorded edits, including investigation-only sessions, do not
+produce a meaningful draft; save a reusable finding explicitly when one was
+learned. Drafts are excluded from automatic recall and remain searchable explicitly;
+raw native Markdown sources are also excluded from automatic
+recall. Ordinary explicit searches retain their existing results. Drafts may be
+titled `<Agent> session <id>` for OpenCode, Claude Code or Codex. Promote a
+useful draft into a real memory instead of writing from scratch.
 The ref is the draft's slug—`punk-records ask` prints it—formed from the title by lowercasing
 and replacing non-alphanumerics with `-`: `opencode-session-<id>`, `claude-code-session-<id>`,
 or `codex-session-<id>`.

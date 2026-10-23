@@ -5,10 +5,14 @@
 First public release as Punk Records. New installs use Punk Records IDs and
 paths; the `previously` command and existing memory stores remain compatible.
 
-- Recall: memories matching the prompt are injected before each turn
-  (Claude Code, Codex, OpenCode).
-- Automatic draft at the end of each turn, listing the files
-  the session edited.
+- Recall: eligible memories matching the prompt are injected automatically;
+  activity drafts and raw native Markdown sources are excluded from automatic
+  recall. Explicit CLI/MCP search defaults remain unchanged.
+- Activity drafts can be saved from successfully observed file edits. They are
+  not guaranteed for every session and do not capture investigation-only
+  findings; saving a reusable outcome remains an agent action.
+- `punk-records ask "<query>" --full` returns JSON; MCP `memory_find` accepts
+  `full: true` for an explicit full result.
 - `punk-records save / ask / build / check / graph / migrate`, MCP server
   (`memory_find`, `memory_save`, `memory_freshness`), skill and
   `/punk-records-save` command (legacy `/previously-save` alias).

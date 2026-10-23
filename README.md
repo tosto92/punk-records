@@ -30,7 +30,7 @@ flowchart LR
 |---|---|
 | **recall** | memories injected automatically when a prompt matches |
 | **memory** | a saved fix, decision or failed attempt |
-| **draft** | a record saved automatically at the end of a turn, listing edited files |
+| **draft** | an activity record that may be saved when a supported hook observes successful file edits |
 | **episodes** | your past Claude Code, Codex and OpenCode sessions, browsable with `punk-records episodes` |
 | **project** | how the episodes page groups sessions |
 | **resume command** | returns to a past session where you left off |
@@ -110,7 +110,9 @@ through saving one memory. Legacy `previously` skill and command names still wor
 | *Where did I leave off on the api project?* | `punk-records episodes projects api`, then the resume command |
 | *What did I work on yesterday?* | `punk-records episodes timeline -d 2` |
 
-After you promote a draft, later automatic captures from that session leave the memory unchanged.
+Automatic recall omits activity drafts and raw native Markdown sources; explicit searches keep their existing results. A draft is only an activity summary of recorded edits, not a learned solution. It is not guaranteed for every session: it needs autosave enabled and supported, successfully observed file edits. Investigation-only sessions do not create a meaningful memory automatically; the agent must choose to save a useful finding. After you promote a draft, later automatic captures from that session leave the memory unchanged.
+
+For complete details, use `punk-records ask "<query>" --full` (JSON array; add `--limit 1` to retrieve one result) or `memory_find({ query, full: true, limit: 1 })`. Full retrieval is explicit; MCP requires `full` to be a boolean. Ordinary CLI and MCP search defaults are unchanged.
 
 ### From the command line
 
