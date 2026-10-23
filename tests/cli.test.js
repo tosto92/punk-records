@@ -109,3 +109,24 @@ test('both CLI aliases support full before or after query and preserve default o
     assert.match(run(['--help']).stdout, /ask <query>.*\[--full\]/);
   }
 });
+
+for (const dryRun of [true, false]) test(`CLI init diagnoses observed Claude cross-file duplicate (${dryRun ? 'dry-run' : 'normal'})`, t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-cli-claude-coverage-'));
+  t.after(() => fs.rmSync(root, {recursive: true, force: true}));
+  const repo = path.join(root, 'repo'), home = path.join(root, 'home');
+  fs.mkdirSync(repo); execFileSync('git', ['init', '-q'], {cwd: repo});
+  const global = path.join(home, '.claude', 'settings.json'), local = path.join(repo, '.claude', 'settings.json');
+  const configs = [[global, {hooks: {UserPromptSubmit: [{hooks: [{type: 'command', command: 'env PUNK_RECORDS_SYNTHESIS=1 previously hook claude UserPromptSubmit'}]}]}}],
+    [local, {hooks: Object.fromEntries(['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop'].map(event => [event, [{hooks: [{type: 'command', command: `previously hook claude ${event}`}]}]]))}]];
+  for (const [file, config] of configs) { fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, JSON.stringify(config)); }
+  const snapshot = () => fs.readdirSync(root, {recursive: true}).sort().map(rel => {
+    const file = path.join(root, rel); return [rel, fs.lstatSync(file).isFile() ? fs.readFileSync(file, 'utf8') : null];
+  });
+  const before = snapshot();
+  const result = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/punk-records'), 'init', '--local', '--agents', 'claude', ...(dryRun ? ['--dry-run'] : [])],
+    {cwd: repo, encoding: 'utf8', env: {...process.env, HOME: home, CLAUDE_CONFIG_DIR: path.dirname(global), PUNK_RECORDS_HOME: path.join(root, 'store')}});
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stderr.split('\n').some(line => /duplicate/.test(line) && line.includes('UserPromptSubmit') && line.includes(global) && line.includes(local)), result.stderr);
+  for (const [file, config] of configs) assert.equal(fs.readFileSync(file, 'utf8'), JSON.stringify(config));
+  if (dryRun) assert.deepEqual(snapshot(), before);
+});

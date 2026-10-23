@@ -98,7 +98,7 @@ test("repo init wires Claude Code: MCP, hooks, CLAUDE.md, skill, command", (t) =
   assert.equal(fs.existsSync(path.join(repo, "AGENTS.md")), false, "AGENTS.md is for opencode/codex");
 });
 
-test("init upgrades owned legacy Claude and Codex entries without duplicate hooks or servers", (t) => {
+test("init upgrades MCP aliases and Codex while preserving duplicate Claude hooks", (t) => {
   const { root, repo, read } = sandbox(t);
   const legacyBin = path.join(root, "node_modules", "previously-on-localhost", "bin", "previously");
   fs.mkdirSync(path.join(repo, ".claude"), { recursive: true });
@@ -116,12 +116,14 @@ test("init upgrades owned legacy Claude and Codex entries without duplicate hook
   fs.writeFileSync(path.join(repo, "AGENTS.md"),
     "before\n<!-- previously:start -->\nold hints\n<!-- previously:end -->\nafter\n");
 
+  const warnings = []; t.mock.method(console, "error", line => warnings.push(line));
   initRepo({ cwd: repo, agents: ["claude", "codex"] });
   const mcp = read(path.join(repo, ".mcp.json")).mcpServers;
   assert.deepEqual(Object.keys(mcp).sort(), ["foreign", "punk-records"]);
   assert.equal(mcp["punk-records"].args[0], BIN);
   const settings = read(path.join(repo, ".claude", "settings.json"));
-  for (const event of CLAUDE_EVENTS) assert.deepEqual(commandsOf(settings, event), [hookCommand("claude", event)]);
+  for (const event of CLAUDE_EVENTS) assert.deepEqual(commandsOf(settings, event), event === "Stop" ? [hookCommand("claude", event), "punk-records hook claude Stop"] : [hookCommand("claude", event)]);
+  assert.ok(warnings.some(line => line.includes(path.join(repo, ".claude", "settings.json")) && /Stop.*duplicate|duplicate.*Stop/.test(line)));
   assert.match(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.punk-records\]/);
   assert.doesNotMatch(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /# previously:|\[mcp_servers\.previously\]/);
   const agents = fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8");
@@ -531,4 +533,149 @@ test('local instruction guidance matches static workflow and retains absolute CL
   assert.ok(text.includes(WORKFLOW_GUIDANCE));
   assert.ok(WORKFLOW_GUIDANCE.length <= 1000);
   assert.ok(text.includes(`node ${BIN} ask`));
+});
+
+const claudeConfig = () => ({hooks: Object.fromEntries(CLAUDE_EVENTS.map(event => [event,
+  [{...(event === 'PostToolUse' ? {matcher: MATCHERS.claude} : {}), hooks: [{type: 'command', command: hookCommand('claude', event), timeout: 10}]}]]))});
+const writeJson = (file, value) => { fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, JSON.stringify(value)); };
+const snapshotFiles = root => Object.fromEntries(fs.readdirSync(root, {recursive: true}).map(rel => [rel, path.join(root, rel)])
+  .filter(([, file]) => fs.lstatSync(file).isFile()).map(([rel, file]) => [rel, fs.readFileSync(file, 'utf8')]));
+
+for (const dryRun of [true, false]) test(`observed global synthesis wrapper and project bare duplicate are preserved and diagnosed (${dryRun ? 'dry-run' : 'normal'})`, t => {
+  const {root, repo, home} = sandbox(t);
+  const global = path.join(home, '.claude', 'settings.json'), local = path.join(repo, '.claude', 'settings.json');
+  writeJson(global, {hooks: {UserPromptSubmit: [{hooks: [{type: 'command', command: 'env PUNK_RECORDS_SYNTHESIS=1 previously hook claude UserPromptSubmit'}]}]}});
+  writeJson(local, claudeConfig());
+  const before = snapshotFiles(root), warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude'], dryRun});
+  assert.equal(fs.readFileSync(local, 'utf8'), before[path.relative(root, local)]);
+  assert.ok(warnings.some(line => line.includes(global) && line.includes(local) && line.includes('UserPromptSubmit') && /duplicate/.test(line)), warnings.join('\n'));
+  if (dryRun) assert.deepEqual(snapshotFiles(root), before);
+});
+
+for (const prefix of ['previously', 'punk-records', 'env PUNK_RECORDS_SYNTHESIS=1 previously', 'env PUNK_RECORDS_SYNTHESIS=1 punk-records']) {
+  test(`Claude local coverage is per event and preserves global ${prefix}`, t => {
+    const {root, repo, read} = sandbox(t);
+    process.env.CLAUDE_CONFIG_DIR = path.join(root, 'relocated-claude');
+    const global = path.join(process.env.CLAUDE_CONFIG_DIR, 'settings.json');
+    const config = {customDisabled: true, hooks: {UserPromptSubmit: [{matcher: '*', hooks: [{type: 'command', command: `${prefix} hook claude UserPromptSubmit`, timeout: 73}]}]}};
+    writeJson(global, config); const before = fs.readFileSync(global, 'utf8');
+    initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+    const local = read(path.join(repo, '.claude', 'settings.json'));
+    assert.deepEqual(commandsOf(local, 'UserPromptSubmit'), []);
+    for (const event of ['SessionStart', 'PostToolUse', 'Stop']) assert.deepEqual(commandsOf(local, event), [hookCommand('claude', event)]);
+    assert.equal(fs.readFileSync(global, 'utf8'), before);
+    initRepo({cwd: repo, explicit: 'global', agents: ['claude']});
+    assert.deepEqual(read(global).hooks.UserPromptSubmit, config.hooks.UserPromptSubmit);
+    assert.equal(read(global).customDisabled, true);
+    assert.deepEqual(commandsOf(read(global), 'UserPromptSubmit'), [`${prefix} hook claude UserPromptSubmit`]);
+  });
+}
+
+for (const [label, event, group, extra] of [
+  ['partial matcher', 'UserPromptSubmit', {matcher: 'only-this'}, {}],
+  ['partial tool matcher', 'PostToolUse', {matcher: 'Write'}, {}],
+  ['async', 'UserPromptSubmit', {}, {async: true}],
+  ['conditional session', 'SessionStart', {}, {if: 'tool_name == "Write"'}],
+  ['conditional tool', 'PostToolUse', {matcher: MATCHERS.claude}, {if: 'tool_input.file_path =~ /src/'}],
+  ['unknown wrapper', 'Stop', {}, {command: 'sh -c "previously hook claude Stop"'}],
+  ['quoted executable wrapper', 'Stop', {}, {command: 'node "/opt/punk-records/bin/previously" hook claude Stop'}],
+  ['unknown env prefix', 'Stop', {}, {command: 'env EXTRA=secret-not-logged PUNK_RECORDS_SYNTHESIS=1 previously hook claude Stop'}],
+  ['non-command type', 'Stop', {}, {type: 'prompt'}],
+]) test(`Claude ${label} is ambiguous, preserved, and does not suppress usable hooks`, t => {
+  const {repo, home, read} = sandbox(t);
+  const global = path.join(home, '.claude', 'settings.json'), local = path.join(repo, '.claude', 'settings.json');
+  const original = {...group, customGroup: 'keep', hooks: [{type: 'command', command: hookCommand('claude', event), timeout: 81, ...extra}, {type: 'command', command: 'foreign', timeout: 99}]};
+  writeJson(global, {hooks: {[event]: [original]}});
+  const warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  assert.deepEqual(commandsOf(read(local), event), [hookCommand('claude', event)]);
+  assert.ok(warnings.some(line => line.includes(global) && line.includes(event) && /ambiguous/.test(line)), warnings.join('\n'));
+  writeJson(local, {hooks: {...claudeConfig().hooks, [event]: [original]}});
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  assert.deepEqual(read(local).hooks[event][0], original);
+  assert.equal(read(local).hooks[event].length, 2);
+  assert.ok(warnings.every(line => !line.includes('secret-not-logged')));
+  const before = fs.readFileSync(local, 'utf8');
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  assert.equal(fs.readFileSync(local, 'utf8'), before);
+});
+
+for (const matcher of [undefined, '', '*', MATCHERS.claude]) test(`Claude PostToolUse global matcher ${JSON.stringify(matcher)} supplies coverage`, t => {
+  const {repo, home, read} = sandbox(t);
+  writeJson(path.join(home, '.claude', 'settings.json'), {hooks: {PostToolUse: [{...(matcher === undefined ? {} : {matcher}), hooks: [{type: 'command', command: hookCommand('claude', 'PostToolUse')}]}]}});
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  assert.deepEqual(commandsOf(read(path.join(repo, '.claude', 'settings.json')), 'PostToolUse'), []);
+});
+
+test('Claude disabled global hooks warn and do not provide effective coverage', t => {
+  const {repo, home, read} = sandbox(t), global = path.join(home, '.claude', 'settings.json');
+  writeJson(global, {disableAllHooks: true, ...claudeConfig()});
+  const warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  for (const event of CLAUDE_EVENTS) assert.deepEqual(commandsOf(read(path.join(repo, '.claude', 'settings.json')), event), [hookCommand('claude', event)]);
+  assert.ok(warnings.some(line => line.includes(global) && /disableAllHooks.*does not override|does not override.*disableAllHooks/.test(line)));
+});
+
+for (const bad of ['malformed', 'unreadable']) test(`Claude ${bad} read-only global config warns and local install completes`, t => {
+  const {repo, home, read} = sandbox(t), global = path.join(home, '.claude', 'settings.json');
+  if (bad === 'malformed') { fs.mkdirSync(path.dirname(global), {recursive: true}); fs.writeFileSync(global, '{secret-not-logged'); }
+  else fs.mkdirSync(global, {recursive: true});
+  const warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  for (const event of CLAUDE_EVENTS) assert.deepEqual(commandsOf(read(path.join(repo, '.claude', 'settings.json')), event), [hookCommand('claude', event)]);
+  assert.ok(warnings.some(line => line.includes(global) && CLAUDE_EVENTS.every(event => line.includes(event)) && /warning/.test(line)));
+  assert.ok(warnings.every(line => !line.includes('secret-not-logged')));
+});
+
+test('Claude duplicate bare and synthesis entries preserve order, custom fields and dry-run bytes', t => {
+  const {root, repo, read} = sandbox(t), local = path.join(repo, '.claude', 'settings.json');
+  const config = claudeConfig();
+  config.hooks.Stop = [{hooks: [{type: 'command', command: 'env PUNK_RECORDS_SYNTHESIS=1 previously hook claude Stop', timeout: 31}, {type: 'command', command: 'foreign'}]},
+    {hooks: [{type: 'command', command: 'punk-records hook claude Stop', timeout: 47}]}];
+  writeJson(local, config); const before = snapshotFiles(root), warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude'], dryRun: true});
+  assert.deepEqual(snapshotFiles(root), before);
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  assert.deepEqual(read(local), config);
+  assert.equal(fs.readFileSync(local, 'utf8'), before[path.relative(root, local)]);
+  assert.ok(warnings.some(line => line.includes(local) && line.includes('Stop') && /duplicate/.test(line)));
+  assert.deepEqual(initRepo({cwd: repo, explicit: 'local', agents: ['claude']}).touched, []);
+});
+
+test('Claude mixed plugin setup warns only about visible configuration', t => {
+  const {repo, home} = sandbox(t), global = path.join(home, '.claude', 'settings.json');
+  writeJson(global, {enabledPlugins: {'punk-records@marketplace': true, 'unrelated@marketplace': true}});
+  const warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  assert.ok(warnings.some(line => line.includes(global) && /visible.*plugin|plugin.*visible/.test(line)));
+});
+
+test('Claude disabled local config retains one usable handler per event across repeated init', t => {
+  const {repo, read} = sandbox(t), local = path.join(repo, '.claude', 'settings.json');
+  writeJson(local, {disableAllHooks: true, ...claudeConfig()});
+  const warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['claude']});
+  const before = fs.readFileSync(local, 'utf8');
+  assert.deepEqual(initRepo({cwd: repo, explicit: 'local', agents: ['claude']}).touched, []);
+  assert.equal(fs.readFileSync(local, 'utf8'), before);
+  for (const event of CLAUDE_EVENTS) assert.deepEqual(commandsOf(read(local), event), [hookCommand('claude', event)]);
+  assert.ok(warnings.some(line => line.includes(local) && line.includes('SessionStart') && /disableAllHooks/.test(line)));
+});
+
+test('Claude malformed global write target aborts before any writes', t => {
+  const {root, repo, home} = sandbox(t), global = path.join(home, '.claude', 'settings.json');
+  fs.mkdirSync(path.dirname(global), {recursive: true}); fs.writeFileSync(global, '{secret-not-logged');
+  const before = snapshotFiles(root);
+  assert.throws(() => initRepo({cwd: repo, explicit: 'global', agents: ['claude']}), error =>
+    error.message.includes(global) && error.message.includes('not valid JSON') && !error.message.includes('secret-not-logged'));
+  assert.deepEqual(snapshotFiles(root), before);
+});
+
+test('non-Claude init does not inspect global Claude settings', t => {
+  const {repo, home} = sandbox(t), global = path.join(home, '.claude', 'settings.json');
+  fs.mkdirSync(global, {recursive: true});
+  const warnings = []; t.mock.method(console, 'error', line => warnings.push(line));
+  initRepo({cwd: repo, explicit: 'local', agents: ['codex']});
+  assert.ok(warnings.every(line => !line.includes(global)));
 });
