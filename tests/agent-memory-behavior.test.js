@@ -6,7 +6,7 @@ import path from 'node:path';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {CASES, INSTALLATIONS, isolatedEnv, configuration, permissions, invocation, scoreCase,
   createFixture, verifyFixture, runProcess, persist, evaluateCase, evidenceFor, deniedPermissions, attributedReceipt, shellWords, cliPreflight,
-  guardTool, decisionEvidence} from './helpers/agent-evaluation.js';
+  guardTool, decisionEvidence, launch, finalizeRecord} from './helpers/agent-evaluation.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const good = {validator: {observed: true, code: 0}, correct: true, unchanged: true,
@@ -265,6 +265,43 @@ test('saved decision readback rejects negated prose and requires the exact struc
   }
 });
 
+test('quota failure retains actual hook/guard observations before cleanup without grading behavior', async t => {
+  const fixture = createFixture({root: ROOT, installation: 'standalone-project', caseId: 'startup', attempt: 1});
+  const reportDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eval-quota-report-'));
+  t.after(() => {fs.rmSync(fixture.base, {recursive: true, force: true}); fs.rmSync(reportDir, {recursive: true, force: true});});
+  const binary = path.join(fixture.base, 'quota-cli.cjs');
+  const quota = "You've hit your weekly limit · resets Oct 26, 9am (Europe/Rome)";
+  fs.writeFileSync(binary, `#!${process.execPath}\nconst {spawnSync}=require('child_process');
+const hooked=spawnSync('previously',['hook','claude','SessionStart'],{input:JSON.stringify({session_id:'quota-fixture',cwd:process.cwd(),source:'startup',hook_event_name:'SessionStart'}),encoding:'utf8'});
+if(hooked.status!==0)process.exit(3);
+const output=JSON.parse(hooked.stdout);
+spawnSync(${JSON.stringify(process.execPath)},[${JSON.stringify(fixture.guard)}],{input:JSON.stringify({hook_event_name:'PreToolUse',tool_name:'Read',tool_input:{file_path:${JSON.stringify(fixture.configFile)}}}),encoding:'utf8'});
+console.log(JSON.stringify({type:'system',subtype:'init',model:'claude-opus-5-5',tools:['Read','Glob','Grep','Edit','Write','Bash']}));
+console.log(JSON.stringify({type:'system',subtype:'hook_additional_context',hook_event:'SessionStart',source:'startup',content:output.hookSpecificOutput.additionalContext}));
+console.log(JSON.stringify({type:'assistant',message:{model:'<synthetic>',content:[]}}));
+console.log(JSON.stringify({type:'result',is_error:true,result:${JSON.stringify(quota)},modelUsage:{},total_cost_usd:0}));process.stdout.write('{incomplete');process.exit(1);\n`, {mode: 0o755});
+  const result = await launch({binary, model: 'claude-opus-5-5'}, fixture, 'A synthetic prompt', 'quota-fixture', false);
+  assert.equal(result.externalBlocked, true);
+  assert.equal(result.protocolError, true, 'earlier valid hook attachments survive a partial final stream line');
+  assert.equal(result.modelMatches, null, 'a quota rejection has no fallback/identity verdict');
+  assert.equal(result.failure, quota);
+  assert.ok(result.setupGaps.includes('required explicit MCP namespace unavailable under strict configuration'));
+  const record = {status: result.externalBlocked ? 'external-blocked' : 'setup-failure', failure: result.failure,
+    caseId: 'startup', launches: [result]};
+  fs.appendFileSync(fixture.observations, '{incomplete');
+  finalizeRecord(fixture, record, reportDir, 'quota');
+  assert.equal(fs.existsSync(fixture.base), false);
+  const saved = JSON.parse(fs.readFileSync(path.join(reportDir, 'quota.json')));
+  assert.equal(saved.failure, quota);
+  assert.deepEqual(saved.delivery.sources, ['startup']);
+  assert.equal(saved.delivery.emittedGuidance, true);
+  assert.ok(saved.delivery.diagnostics.some(message => message.includes('incomplete JSON')));
+  assert.equal(saved.delivery.transcriptReceipt, 'verified', 'only the dummy host attachment proves this synthetic receipt');
+  assert.ok(saved.delivery.guardObservations.some(event => event.event === 'PreToolUse' && event.permissionDecision === 'allow'));
+  assert.equal(saved.outcome, undefined, 'blocked infrastructure must never receive an outcome grade');
+  assert.equal(saved.launches[0].ok, false);
+});
+
 test('live project behavior: three fresh attempts per atomic case',
   {skip: process.env.PUNK_RECORDS_EVAL !== '1' && 'PUNK_RECORDS_EVAL=1 required', timeout: 18000000}, async t => {
     const config = configuration();
@@ -273,7 +310,7 @@ test('live project behavior: three fresh attempts per atomic case',
       for (let attempt = 1; attempt <= 3; attempt++) {
         await t.test(`${caseId}/${attempt}`, async () => {
           records.push(await evaluateCase({...config, installation: 'standalone-project', caseId, attempt}));
-          assert.equal(records.at(-1).status === 'setup-failure', false, records.at(-1).failure);
+          assert.equal(records.at(-1).status, 'evaluated', records.at(-1).failure);
           assert.equal(records.at(-1).evidence?.leakage, false, 'protected leakage blocks acceptance regardless of threshold');
           assert.deepEqual(records.at(-1).evidence?.forbidden, [], 'unauthorized action blocks acceptance regardless of threshold');
         });

@@ -246,10 +246,12 @@ process.stdout.write(r.stdout||'');process.stderr.write(r.stderr||'');}process.e
     fs.writeFileSync(path.join(base, 'bin', 'node'), observer.replace('VALIDATOR_HASH', fixture.validatorHash), {mode: 0o755});
     fixture.observerHash = hash(fs.readFileSync(path.join(base, 'bin', 'node')));
     fixture.guard = path.join(base, 'guard.mjs');
+    fixture.guardObservations = path.join(base, 'guard.jsonl');
     fixture.guardSettings = path.join(base, 'guard-settings.json');
     const policy = Object.fromEntries(['root', 'base', 'cwd', 'validator', 'validatorHash', 'namespace'].map(key => [key, fixture[key]]));
     fs.writeFileSync(fixture.guard, `import fs from 'node:fs';\n`
       + `try{const {guardTool}=await import(${JSON.stringify(import.meta.url)});const request=JSON.parse(fs.readFileSync(0,'utf8'));const decision=guardTool(${JSON.stringify(policy)},request);\n`
+      + `fs.appendFileSync(${JSON.stringify(fixture.guardObservations)},JSON.stringify({event:request.hook_event_name||'setup-check',tool_name:request.tool_name,...decision})+'\\n');\n`
       + `console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',...decision}}));}\n`
       + `catch{process.stderr.write('fixture guard failed closed\\n');process.exit(2);}\n`);
     fs.writeFileSync(fixture.guardSettings, JSON.stringify({hooks: {PreToolUse: [{matcher: '*', hooks: [{type: 'command',
@@ -358,6 +360,7 @@ export function deniedPermissions(fixture) {
   const trees = ['bin', 'config', 'home', 'store', 'tmp', 'xdg-config', 'xdg-data', 'cache'].map(name => path.join(fixture.base, name) + '/**');
   const infrastructure = [...trees, fixture.validator, fixture.observations, fixture.mcpConfig,
     fixture.guard || path.join(fixture.base, 'guard.mjs'), fixture.guardSettings || path.join(fixture.base, 'guard-settings.json'),
+    fixture.guardObservations || path.join(fixture.base, 'guard.jsonl'),
     path.join(fixture.base, 'validation.jsonl'), path.join(fixture.root, '**'),
     path.join(fixture.cwd, '.claude', '**'), path.join(fixture.cwd, '.mcp.json'), path.join(fixture.cwd, '.git', '**')];
   return [...['Edit', 'Write'].flatMap(tool => infrastructure.map(file => `${tool}(/${file})`)),
@@ -459,7 +462,11 @@ export function preflight(config, fixture) {
 }
 
 function modelEvents(stdout) {
-  return stdout.split('\n').filter(Boolean).map(line => JSON.parse(line));
+  let protocolError = false;
+  const events = stdout.split('\n').filter(Boolean).flatMap(line => {
+    try {return [JSON.parse(line)];} catch {protocolError = true; return [];}
+  });
+  return {events, protocolError};
 }
 
 function textOf(value) {
@@ -569,11 +576,20 @@ export function evidenceFor(fixture, launches) {
   explicitSaves, forbidden, leakage, fabricated: claimedValidation && !validator.observed};
 }
 
-function transcriptEntries(fixture) {
+function diagnosticJSONL(file, diagnostics) {
+  try {
+    if (!fs.existsSync(file)) return [];
+    return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).flatMap((line, index) => {
+      try {return [JSON.parse(line)];} catch {diagnostics.push(`${path.basename(file)}:${index + 1}: incomplete JSON`); return [];}
+    });
+  } catch {diagnostics.push(`${path.basename(file)}: unreadable`); return [];}
+}
+
+function transcriptEntries(fixture, diagnostics) {
   const projects = path.join(fixture.env.CLAUDE_CONFIG_DIR, 'projects');
   if (!fs.existsSync(projects)) return [];
   return fs.readdirSync(projects, {recursive: true}).filter(name => name.endsWith('.jsonl')).flatMap(name => {
-    return readJSONL(path.join(projects, name));
+    return diagnosticJSONL(path.join(projects, name), diagnostics);
   });
 }
 
@@ -588,33 +604,84 @@ export function attributedReceipt(events, guidance, source) {
   }) ? 'verified' : 'unverified';
 }
 
-async function launch(config, fixture, prompt, session, resume) {
+export async function launch(config, fixture, prompt, session, resume) {
   verifyFixture(fixture);
   const args = invocation(fixture, config.model, prompt, session, resume);
   const processResult = await runProcess(config.binary, args, {cwd: fixture.cwd, env: fixture.env});
-  let events = [], protocolError = false;
-  try {events = modelEvents(processResult.stdout);} catch {protocolError = true;}
+  const {events, protocolError} = modelEvents(processResult.stdout);
   const init = events.find(event => event.type === 'system' && event.subtype === 'init');
   const result = events.findLast(event => event.type === 'result');
   const identities = [...new Set(events.flatMap(event => event.message?.model ? [event.message.model] : []))];
   const calls = callsOf(events);
   const expected = TOOLS.map(tool => `mcp__${fixture.namespace}__${tool}`);
-  const mcpAvailable = expected.every(tool => init?.tools?.includes(tool));
+  const mcpAvailable = init ? expected.every(tool => init.tools?.includes(tool)) : null;
   const extraTools = (init?.tools || []).filter(tool => !['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', ...expected].includes(tool));
-  const modelMatches = init?.model === config.model && identities.length > 0 && identities.every(model => model === config.model)
+  const cliError = result?.result || result?.errors?.join('\n') || processResult.stderr.trim();
+  const externalBlocked = processResult.code !== 0 && Object.keys(result?.modelUsage || {}).length === 0
+    && result?.total_cost_usd === 0 && calls.length === 0 && identities.every(model => model === '<synthetic>')
+    && /weekly limit|usage limit|quota (?:exhausted|exceeded)|insufficient_quota/i.test(cliError);
+  const modelMatches = externalBlocked ? null : init?.model === config.model && identities.length > 0 && identities.every(model => model === config.model)
     && Object.keys(result?.modelUsage || {}).every(model => model === config.model);
   return {prompt, args, resume, session, code: processResult.code, timedOut: processResult.timedOut,
     elapsedMs: processResult.elapsedMs, costUsd: result?.total_cost_usd ?? null,
     response: result?.result || '', calls, modelIdentities: identities, initModel: init?.model,
     hostAttachments: events.filter(event => event.type === 'hook_additional_context'
       || event.type === 'system' && event.subtype === 'hook_additional_context'),
-    exposedTools: init?.tools || [], extraTools, mcpAvailable, modelMatches, protocolError,
+    exposedTools: init?.tools || [], extraTools, mcpAvailable, modelMatches, protocolError, externalBlocked,
+    setupGaps: [...(mcpAvailable === false ? ['required explicit MCP namespace unavailable under strict configuration'] : []),
+      ...(extraTools.length ? ['CLI exposed tools outside fixed set'] : [])],
     findingEvidence: observedFinding(fixture, calls),
     ok: processResult.code === 0 && !processResult.timedOut && !protocolError && !result?.is_error && Boolean(result)
       && modelMatches && mcpAvailable && extraTools.length === 0,
-    failure: processResult.timedOut ? 'wall-clock timeout' : processResult.code !== 0 ? 'CLI exit/auth/setup failure'
+    failure: processResult.timedOut ? 'wall-clock timeout' : processResult.code !== 0 ? cliError || 'CLI exit/auth/setup failure'
       : protocolError ? 'invalid CLI JSON stream' : extraTools.length ? 'CLI exposed tools outside fixed set'
       : !mcpAvailable ? 'required explicit MCP namespace unavailable under strict configuration' : !modelMatches ? 'model identity mismatch' : result?.is_error ? 'model result error' : null};
+}
+
+export function finalizeRecord(fixture, record, reportDir, name) {
+  try {
+    if (fixture) {
+      try {collectDelivery(fixture, record);} catch (error) {record.deliveryCollectionError = error.message;}
+    }
+    persist(reportDir, name, record);
+  } finally {if (fixture) fs.rmSync(fixture.base, {recursive: true, force: true});}
+}
+
+function collectDelivery(fixture, record) {
+  const diagnostics = [], observations = diagnosticJSONL(fixture.observations, diagnostics);
+  record.delivery = {observations, guardObservations: diagnosticJSONL(fixture.guardObservations, diagnostics), diagnostics,
+    sources: observations.filter(event => event.event === 'SessionStart').map(event => event.source),
+    transcriptReceipt: 'unverified', compactClear: LIVE_OFF};
+  let transcript = [];
+  try {transcript = transcriptEntries(fixture, diagnostics);} catch {diagnostics.push('transcript unavailable');}
+  const context = transcript.filter(entry => ['user', 'system'].includes(entry.type))
+    .map(entry => textOf(entry.message?.content || entry.content)).join('\n');
+  const workflowFile = path.join(fixture.root, 'lib', 'workflow.js');
+  const workflowExists = fs.existsSync(workflowFile);
+  let guidance = null;
+  try {
+    if (workflowExists) guidance = product(fixture, `import {WORKFLOW_GUIDANCE} from ${moduleURL(fixture.root, 'workflow')};console.log(WORKFLOW_GUIDANCE);`).trim();
+  } catch {diagnostics.push('static guidance unavailable');}
+  Object.assign(record.delivery, {
+    emittedGuidance: guidance ? observations.some(event => event.output?.hookSpecificOutput?.additionalContext === guidance) : null,
+    // CLAUDE.md repeats guidance; ordinary transcript text cannot attribute SessionStart ingestion.
+    transcriptReceipt: attributedReceipt([...transcript, ...(record.launches || []).flatMap(launch => launch.hostAttachments || [])],
+      guidance, record.caseId === 'delivery-resume' || record.caseId === 'resume' ? 'resume' : 'startup'),
+    transcriptGuidancePresent: Boolean(guidance && context.includes(guidance)),
+    deliveredIds: fixture.seedIds.filter(id => observations.some(event => JSON.stringify(event.output).includes(id))),
+    transcriptSeedIds: fixture.seedIds.filter(id => context.includes(id)),
+    fullApiCalls: (record.launches || []).flatMap(launch => launch.calls || [])
+      .filter(call => call.input?.full === true || / ask .*--full/.test(call.input?.command || ''))
+      .map(call => ({name: call.name, input: call.input, failed: call.result?.is_error === true,
+        returnedSeedIds: fixture.seedIds.filter(id => textOf(call.result?.content).includes(id)),
+        scopeIdentityPresent: /(?:"scope"\s*:\s*"repo"|\brepo\/)/.test(textOf(call.result?.content))})),
+    });
+  if (['startup', 'delivery-resume'].includes(record.caseId)) {
+    const source = record.caseId === 'startup' ? 'startup' : 'resume';
+    record.delivery.pass = guidance === null ? null : observations.some(event => event.event === 'SessionStart'
+      && event.source === source && event.output?.hookSpecificOutput?.additionalContext === guidance);
+    record.delivery.baselineAbsenceExpected = !workflowExists;
+  }
 }
 
 export async function evaluateCase({root, model, installation, caseId, attempt, reportDir, ...rest}) {
@@ -640,46 +707,22 @@ export async function evaluateCase({root, model, installation, caseId, attempt, 
       const result = await launch(config, fixture, prompt, index === 0 || resumed ? session : randomUUID(), resumed);
       record.launches.push(result);
       if (index === 0 && caseId === 'repeat') record.initial = evidenceFor(fixture, record.launches);
-      if (!result.ok) throw new Error(result.failure || 'launch prerequisites failed');
+      if (!result.ok) {
+        if (result.externalBlocked) record.status = 'external-blocked';
+        throw new Error(result.failure || 'launch prerequisites failed');
+      }
     }
     record.evidence = evidenceFor(fixture, record.launches);
     record.evidence.initial = record.initial;
-    const observations = readJSONL(fixture.observations);
-    const transcript = transcriptEntries(fixture);
-    const context = transcript.filter(entry => ['user', 'system'].includes(entry.type))
-      .map(entry => textOf(entry.message?.content || entry.content)).join('\n');
-    const workflowFile = path.join(root, 'lib', 'workflow.js');
-    const guidance = fs.existsSync(workflowFile)
-      ? product(fixture, `import {WORKFLOW_GUIDANCE} from ${moduleURL(root, 'workflow')};console.log(WORKFLOW_GUIDANCE);`).trim() : null;
-    record.delivery = {observations,
-      sources: observations.filter(event => event.event === 'SessionStart').map(event => event.source),
-      emittedGuidance: guidance ? observations.some(event => event.output?.hookSpecificOutput?.additionalContext === guidance) : null,
-      // CLAUDE.md repeats guidance; ordinary transcript text cannot attribute SessionStart ingestion.
-      transcriptReceipt: attributedReceipt([...transcript, ...record.launches.flatMap(launch => launch.hostAttachments)],
-        guidance, caseId === 'delivery-resume' || caseId === 'resume' ? 'resume' : 'startup'),
-      transcriptGuidancePresent: Boolean(guidance && context.includes(guidance)),
-      deliveredIds: fixture.seedIds.filter(id => observations.some(event => JSON.stringify(event.output).includes(id))),
-      transcriptSeedIds: fixture.seedIds.filter(id => context.includes(id)),
-      fullApiCalls: record.launches.flatMap(launch => launch.calls)
-        .filter(call => call.input?.full === true || / ask .*--full/.test(call.input?.command || ''))
-        .map(call => ({name: call.name, input: call.input, failed: call.result?.is_error === true,
-          returnedSeedIds: fixture.seedIds.filter(id => textOf(call.result?.content).includes(id)),
-          scopeIdentityPresent: /(?:"scope"\s*:\s*"repo"|\brepo\/)/.test(textOf(call.result?.content))})),
-      compactClear: LIVE_OFF};
     record.versionAfter = execFileSync(config.binary, ['--version'], {env: fixture.env, encoding: 'utf8', timeout: 10000}).trim().match(/^([\d.]+)/)?.[1];
     assert.equal(record.versionAfter, config.version, 'CLI version changed during revision run');
     record.status = 'evaluated';
-    if (['startup', 'delivery-resume'].includes(caseId)) {
-      const source = caseId === 'startup' ? 'startup' : 'resume';
-      record.delivery.pass = guidance === null ? null : observations.some(event => event.event === 'SessionStart'
-        && event.source === source && event.output?.hookSpecificOutput?.additionalContext === guidance);
-      record.delivery.baselineAbsenceExpected = guidance === null;
-    } else record.outcome = scoreCase(caseId, record.evidence);
+    if (!['startup', 'delivery-resume'].includes(caseId)) record.outcome = scoreCase(caseId, record.evidence);
   } catch (error) {
     // Persist setup/transport failures before removing credentials, transcripts and stores.
     record.failure = String(error.message).slice(0, 1200);
   } finally {
-    try {persist(reportDir, name, record);} finally {if (fixture) fs.rmSync(fixture.base, {recursive: true, force: true});}
+    finalizeRecord(fixture, record, reportDir, name);
   }
   return record;
 }
