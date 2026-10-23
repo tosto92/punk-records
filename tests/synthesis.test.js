@@ -11,9 +11,7 @@ import {spawnSync} from 'node:child_process';
 
 function fixture(t) {
   const f = securityFixture(t);
-  const prior = process.env.PUNK_RECORDS_SYNTHESIS;
-  t.after(() => { if (prior === undefined) delete process.env.PUNK_RECORDS_SYNTHESIS; else process.env.PUNK_RECORDS_SYNTHESIS = prior; });
-  process.env.PUNK_RECORDS_SYNTHESIS = '1';
+  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1', PREVIOUSLY_SYNTHESIS: '1'});
   writeSecurityStore(f.home, [benign]);
   const file = path.join(f.root, 'native.md'); fs.writeFileSync(file, 'deploy native detail');
   return {...f, file, store: f.home, scope: 'global'};
@@ -27,6 +25,10 @@ test('lifecycle keeps originals, no-op, isolated dirty groups and freshness on e
   assert.equal(synthesisStatus(f).groups[0].status, 'valid');
   assert.equal(prepareSynthesis(f).groups.length, 0);
   assert.equal(search({query: 'deploy', limit: 20, resolved: f.resolved}).length, 3);
+  const automatic = search({query: 'deploy', limit: 20, resolved: f.resolved, automatic: true});
+  assert.equal(f.calls().at(-1).length, 3);
+  assert.equal(automatic.some(h => h.native), false);
+  assert.equal(automatic.some(h => h.derived), true);
   assert.match(formatHits(search({query: 'deploy', limit: 20, resolved: f.resolved})), /sources:/);
   process.env.PUNK_RECORDS_SYNTHESIS = '0'; assert.equal(search({query: 'deploy', resolved: f.resolved}).length, 1);
   process.env.PUNK_RECORDS_SYNTHESIS = '1';
@@ -72,7 +74,9 @@ test('protected recall requires dependencies and candidate approval, including r
   assert.throws(() => applySynthesis({...f, response: bad}));
   applySynthesis({...f, response: response(p)});
   assert.ok(search({query: 'deploy', resolved: f.resolved}).some(h => h.derived));
+  assert.ok(search({query: 'deploy', resolved: f.resolved, automatic: true}).some(h => h.derived));
   recordDecision(entries[0], report.results[0], 'exclude');
+  assert.equal(search({query: 'deploy', resolved: f.resolved, automatic: true}).some(h => h.derived), false);
   assert.equal(search({query: 'deploy', resolved: f.resolved}).some(h => h.derived), false);
 });
 

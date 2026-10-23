@@ -6,6 +6,9 @@ import path from 'node:path';
 import {search, formatHits} from '../lib/ask.js';
 import {scanStore} from '../lib/security/scan.js';
 import {recordDecision} from '../lib/security/review.js';
+import {summarizeActivity, isDraft} from '../lib/activity.js';
+import {loadMemories} from '../lib/build.js';
+import {globalDir} from '../lib/paths.js';
 import {saveMemory} from '../lib/save.js';
 import {securityFixture, writeSecurityStore, attack, benign, benignId, attackId} from './helpers/security.js';
 import {spawnSync} from 'node:child_process';
@@ -18,9 +21,15 @@ function writeScope(dir, memories) {
 }
 function fixture(t, memories) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-ask-'));
-  const previous = process.env.PREVIOUSLY_HOME;
-  process.env.PREVIOUSLY_HOME = home;
-  t.after(() => { if (previous === undefined) delete process.env.PREVIOUSLY_HOME; else process.env.PREVIOUSLY_HOME = previous; fs.rmSync(home, {recursive: true, force: true}); });
+  const names = ['PUNK_RECORDS_HOME', 'PREVIOUSLY_HOME', 'PUNK_RECORDS_SECURITY', 'PREVIOUSLY_SECURITY',
+    'PUNK_RECORDS_SYNTHESIS', 'PREVIOUSLY_SYNTHESIS'];
+  const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  Object.assign(process.env, {PUNK_RECORDS_HOME: home, PREVIOUSLY_HOME: home, PUNK_RECORDS_SECURITY: '0',
+    PREVIOUSLY_SECURITY: '0', PUNK_RECORDS_SYNTHESIS: '0', PREVIOUSLY_SYNTHESIS: '0'});
+  t.after(() => {
+    for (const name of names) if (prior[name] === undefined) delete process.env[name]; else process.env[name] = prior[name];
+    fs.rmSync(home, {recursive: true, force: true});
+  });
   writeScope(home, memories);
   return {home, resolved: {repoRoot: null}};
 }
@@ -181,4 +190,48 @@ test('real NOVA save evidence gates shared retrieval before limiting', t => {
   const logs = []; t.mock.method(console, 'error', line => logs.push(line));
   assert.equal(search({query: 'deploy', limit: 1, resolved: f.resolved})[0].memoryId, safe.memoryId);
   assert.doesNotMatch(logs.join('\n'), /quarantined|QUARANTINED|Ignore/);
+});
+
+test('automatic eligibility precedes limiting and keeps promoted activity and symptom-only notes', t => {
+  const f = securityFixture(t), options = {cwd: f.home, scope: 'global'};
+  const prompt = 'deploy\nsecond line\nthird line\nCOMPLETE_ORIGINAL_ACTIVITY';
+  const drafts = Array.from({length: 4}, (_, i) => saveMemory(
+    summarizeActivity(['deploy.js'], {sessionId: `deploy-${i}`, prompt}), options));
+  const promoted = saveMemory(summarizeActivity(['worker.js'], {sessionId: 'worker'}), options);
+  assert.equal(isDraft(loadMemories(f.home).memories.find(m => m.memoryId === promoted.memoryId)), true);
+  saveMemory({ref: promoted.memoryId, type: 'solved', title: 'Worker recovery', solution: 'deploy safely'}, options);
+  const memory = loadMemories(f.home).memories.find(m => m.memoryId === promoted.memoryId);
+  assert.equal(isDraft(memory), false); assert.ok(memory.tags.includes('auto'));
+  const note = saveMemory({type: 'note', title: 'Useful observation', symptoms: 'deploy times out'}, options);
+  const evidence = path.join(f.root, 'search-evidence.json');
+  fs.appendFileSync(f.interpreter, `\nfs.writeFileSync(${JSON.stringify(evidence)}, JSON.stringify(request));\n`);
+  const explicit = search({query: 'deploy', limit: 20, resolved: f.resolved});
+  assert.ok(drafts.every(d => explicit.some(h => h.memoryId === d.memoryId)));
+  assert.ok(explicit.slice(0, 2).every(h => drafts.some(d => d.memoryId === h.memoryId)));
+  const automatic = search({query: 'deploy', limit: 2, resolved: f.resolved, automatic: true});
+  const scanned = JSON.parse(fs.readFileSync(evidence, 'utf8')).items;
+  assert.equal(scanned.length, 6);
+  assert.ok(scanned.find(item => item.memoryId === drafts[0].memoryId).texts.some(field => field.text === prompt));
+  assert.deepEqual(new Set(automatic.map(h => h.memoryId)), new Set([promoted.memoryId, note.memoryId]));
+});
+
+test('search fixtures isolate both current and legacy environment aliases', async t => {
+  const names = ['PUNK_RECORDS_HOME', 'PREVIOUSLY_HOME', 'PUNK_RECORDS_SECURITY', 'PREVIOUSLY_SECURITY',
+    'PUNK_RECORDS_PYTHON', 'PREVIOUSLY_PYTHON', 'PUNK_RECORDS_SYNTHESIS', 'PREVIOUSLY_SYNTHESIS'];
+  const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  t.after(() => { for (const name of names) if (prior[name] === undefined) delete process.env[name]; else process.env[name] = prior[name]; });
+  for (const name of names) process.env[name] = `/poison/${name}`;
+  await t.test('ordinary search', child => {
+    const simple = fixture(child, [{title: 'deploy isolated'}]);
+    assert.equal(globalDir(), simple.home);
+    assert.equal(search({query: 'deploy', resolved: simple.resolved}).length, 1);
+  });
+  await t.test('protected search', child => {
+    const f = securityFixture(child);
+    writeSecurityStore(f.home, [benign]);
+    assert.equal(globalDir(), f.home);
+    assert.equal(search({query: 'deploy', resolved: f.resolved})[0].memoryId, benignId);
+    assert.ok(f.calls().flat().every(([store]) => store.startsWith(f.root + path.sep)));
+  });
+  for (const name of names) assert.equal(process.env[name], `/poison/${name}`);
 });
