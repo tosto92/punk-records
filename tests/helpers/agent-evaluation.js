@@ -16,6 +16,90 @@ const hash = text => createHash('sha256').update(text).digest('hex');
 const readJSONL = file => fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(JSON.parse) : [];
 const inside = (root, file) => file === root || file.startsWith(root + path.sep);
 
+const taskMetadata = name => ['.git', '.claude', 'memory', '.mcp.json', '.punk-records', '.previously'].includes(name);
+
+function physicalPath(file) {
+  let current = path.resolve(file);
+  const missing = [];
+  while (true) {
+    try {fs.lstatSync(current); break;} catch (error) {if (error.code !== 'ENOENT') throw error;}
+    const parent = path.dirname(current);
+    if (parent === current) throw new Error('missing path root');
+    missing.unshift(path.basename(current)); current = parent;
+  }
+  return path.join(fs.realpathSync(current), ...missing);
+}
+
+function admittedPath(fixture, file, write = false) {
+  if (typeof file !== 'string' || !file || file.startsWith('~') || file.includes('\0')) return false;
+  const lexical = path.resolve(fixture.cwd, file), physical = physicalPath(lexical);
+  if (lexical === fixture.validator && !write) return physical === fixture.validator;
+  if (inside(fixture.cwd, lexical) && inside(fixture.cwd, physical)) {
+    const first = path.relative(fixture.cwd, lexical).split(path.sep)[0];
+    const actualFirst = path.relative(fixture.cwd, physical).split(path.sep)[0];
+    return !taskMetadata(first) && !taskMetadata(actualFirst)
+      && !(write && ['CLAUDE.md', 'AGENTS.md', '.gitattributes'].includes(first));
+  }
+  if (!write && inside(fixture.root, lexical) && inside(fixture.root, physical)) {
+    const first = path.relative(fixture.root, physical).split(path.sep)[0];
+    return ['lib', 'bin', 'skills', 'commands', 'hooks', '.claude-plugin', 'docs', 'README.md', 'package.json'].includes(first);
+  }
+  return false;
+}
+
+function safeSearchTree(fixture, directory) {
+  if (!fs.statSync(directory).isDirectory()) return true;
+  for (const name of fs.readdirSync(directory)) {
+    if (taskMetadata(name)) continue; // Installed metadata is immutable to native model tools.
+    const file = path.join(directory, name), info = fs.lstatSync(file);
+    if (info.isSymbolicLink()) {if (!admittedPath(fixture, file)) return false;}
+    else if (info.isDirectory() && !safeSearchTree(fixture, file)) return false;
+  }
+  return true;
+}
+
+export function guardTool(fixture, request) {
+  const deny = {permissionDecision: 'deny', permissionDecisionReason: 'Evaluation fixture boundary: access denied before tool execution.'};
+  try {
+    const {tool_name: name, tool_input: input} = request;
+    if (!input || typeof input !== 'object') return deny;
+    let allowed = false;
+    if (['Read', 'Edit', 'Write'].includes(name)) allowed = admittedPath(fixture, input.file_path, name !== 'Read');
+    else if (['Glob', 'Grep'].includes(name)) {
+      const file = path.resolve(fixture.cwd, input.path || '.');
+      const pattern = name === 'Glob' ? input.pattern : '';
+      const patternSafe = typeof pattern === 'string' && !pattern.split(/[\\/]/).includes('..')
+        && (!path.isAbsolute(pattern) || admittedPath(fixture, pattern.split(/[*?{[]/)[0]));
+      allowed = admittedPath(fixture, file) && patternSafe && safeSearchTree(fixture, physicalPath(file));
+    } else if (name === 'Bash') {
+      allowed = !input.run_in_background && !input.dangerouslyDisableSandbox
+        && (validatorCommand(fixture, input.command) || Boolean(memoryCommand(fixture, shellWords(input.command || ''))));
+      if (allowed && validatorCommand(fixture, input.command)) allowed = hash(fs.readFileSync(fixture.validator)) === fixture.validatorHash;
+    } else allowed = TOOLS.some(tool => name === `mcp__${fixture.namespace}__${tool}`);
+    return allowed ? {permissionDecision: 'allow'} : deny;
+  } catch {return deny;}
+}
+
+function parseDecision(value) {
+  try {return JSON.parse(value.trim().replace(/^```(?:json)?\s*|\s*```$/g, ''));} catch {return null;}
+}
+
+function correctDecision(fixture, value) {
+  return value?.route === fixture.answer && value.empty === true && value.reason === fixture.reason
+    && Object.keys(value).length === 3;
+}
+
+function observedFinding(fixture, calls) {
+  const ticket = fs.readFileSync(path.join(fixture.cwd, 'ticket.md'), 'utf8');
+  return calls.some(call => call.result && call.result.is_error !== true && call.result.tool_use_id === call.id
+    && (call.name === 'Read' && path.resolve(fixture.cwd, call.input?.file_path || '') === path.join(fixture.cwd, 'ticket.md')
+      && ticket.trim().split('\n').every(line => textOf(call.result.content).includes(line))
+      || call.name === 'Bash' && validatorCommand(fixture, call.input?.command)
+        && textOf(call.result.content).includes(`VALIDATED ${fixture.answer}: ${fixture.reason}`)));
+}
+
+export const decisionEvidence = (fixture, response, calls) => Boolean(correctDecision(fixture, parseDecision(response)) && observedFinding(fixture, calls));
+
 export function isolatedEnv(base, inherited = process.env) {
   // An allowlist avoids missing obscure legacy auth/config aliases and shell startup injection.
   const env = {PATH: path.join(base, 'bin') + path.delimiter + '/usr/local/bin:/usr/bin:/bin',
@@ -131,6 +215,13 @@ process.stdout.write(r.stdout||'');process.stderr.write(r.stderr||'');}process.e
       startup: ['Investigate the parser empty-frame boundary failure.'],
       'delivery-resume': ['Investigate the parser empty-frame boundary failure.', 'Check the parser empty-frame boundary issue again.'],
     }[caseId];
+    if (['save-decision', 'no-save'].includes(caseId)) {
+      const format = ' Return only a JSON object with route (string), empty (boolean), and reason (the exact vendor compatibility note from ticket.md).';
+      fixture.prompts = fixture.prompts.map(prompt => prompt + format);
+      fs.appendFileSync(path.join(fixture.cwd, 'README.md'),
+        'Decision conclusion format: {"route":"chosen route","empty":true,"reason":"exact vendor compatibility note"}. '
+        + 'When recording a reusable decision, the solution is that same JSON object; validation and evidence can be recorded in symptoms or attempts.\n');
+    }
     fs.writeFileSync(path.join(fixture.cwd, 'recovery.json'), JSON.stringify({safe: `recover-${fixture.seed}`,
       reason: 'a full journal must be retained before recovery', unsafe: 'discard the journal'}));
     assert.ok(fixture.prompts, 'unknown case');
@@ -154,19 +245,54 @@ process.stdout.write(r.stdout||'');process.stderr.write(r.stderr||'');}process.e
     fixture.validatorHash = hash(fs.readFileSync(fixture.validator));
     fs.writeFileSync(path.join(base, 'bin', 'node'), observer.replace('VALIDATOR_HASH', fixture.validatorHash), {mode: 0o755});
     fixture.observerHash = hash(fs.readFileSync(path.join(base, 'bin', 'node')));
+    fixture.guard = path.join(base, 'guard.mjs');
+    fixture.guardSettings = path.join(base, 'guard-settings.json');
+    const policy = Object.fromEntries(['root', 'base', 'cwd', 'validator', 'validatorHash', 'namespace'].map(key => [key, fixture[key]]));
+    fs.writeFileSync(fixture.guard, `import fs from 'node:fs';\n`
+      + `try{const {guardTool}=await import(${JSON.stringify(import.meta.url)});const request=JSON.parse(fs.readFileSync(0,'utf8'));const decision=guardTool(${JSON.stringify(policy)},request);\n`
+      + `console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',...decision}}));}\n`
+      + `catch{process.stderr.write('fixture guard failed closed\\n');process.exit(2);}\n`);
+    fs.writeFileSync(fixture.guardSettings, JSON.stringify({hooks: {PreToolUse: [{matcher: '*', hooks: [{type: 'command',
+      command: `${JSON.stringify(process.execPath)} ${JSON.stringify(fixture.guard)}`, timeout: 10}]}]}}));
+    fixture.guardHash = hash(fs.readFileSync(fixture.guard));
+    fixture.guardSettingsHash = hash(fs.readFileSync(fixture.guardSettings));
     return fixture;
   } catch (error) { fs.rmSync(base, {recursive: true, force: true}); throw error; }
 }
 
 function sourceSnapshot(fixture) {
-  return Object.fromEntries(['routing.json', 'ticket.md', 'README.md', 'spelling.txt', 'recovery.json'].map(name =>
-    [name, hash(fs.readFileSync(path.join(fixture.cwd, name)))]));
+  const entries = [];
+  const visit = (directory, relative = '') => {
+    for (const name of fs.readdirSync(directory).sort()) {
+      if (!relative && taskMetadata(name)) continue;
+      const file = path.join(directory, name), key = path.join(relative, name), info = fs.lstatSync(file);
+      if (info.isSymbolicLink()) entries.push([key, ['link', fs.readlinkSync(file)]]);
+      else if (info.isDirectory()) {entries.push([key, ['directory']]); visit(file, key);}
+      else entries.push([key, ['file', hash(fs.readFileSync(file))]]);
+    }
+  };
+  visit(fixture.cwd);
+  return entries;
 }
 
 export function verifyFixture(fixture) {
   const {root, base, env} = fixture;
   assert.equal(hash(fs.readFileSync(fixture.validator)), fixture.validatorHash, 'trusted validator changed');
   assert.equal(hash(fs.readFileSync(path.join(base, 'bin', 'node'))), fixture.observerHash, 'hook observer changed');
+  assert.equal(hash(fs.readFileSync(fixture.guard)), fixture.guardHash, 'trusted tool guard changed');
+  assert.equal(hash(fs.readFileSync(fixture.guardSettings)), fixture.guardSettingsHash, 'trusted guard settings changed');
+  const guardSettings = JSON.parse(fs.readFileSync(fixture.guardSettings));
+  assert.deepEqual(Object.keys(guardSettings.hooks), ['PreToolUse'], 'guard must not replace installation hooks');
+  for (const [tool_name, tool_input, expected] of [
+    ['Read', {file_path: path.join(base, 'config', '.credentials.json')}, 'deny'],
+    ['Read', {file_path: '/etc/passwd'}, 'deny'],
+    ['Write', {file_path: path.join(path.dirname(base), 'unrelated-host-file')}, 'deny'],
+    ['Read', {file_path: fixture.configFile}, 'allow'],
+  ]) {
+    const response = execFileSync(process.execPath, [fixture.guard], {cwd: fixture.cwd, env,
+      input: JSON.stringify({tool_name, tool_input}), encoding: 'utf8', timeout: 10000});
+    assert.equal(JSON.parse(response).hookSpecificOutput.permissionDecision, expected, 'trusted native guard preflight');
+  }
   assert.equal(fs.realpathSync(root), root, 'revision root must be a realpath');
   for (const alias of ['punk-records', 'previously']) {
     const expected = fs.realpathSync(path.join(root, 'bin', alias));
@@ -221,6 +347,7 @@ export function invocation(fixture, model, prompt, session, resume = false) {
   return ['-p', prompt, '--output-format', 'stream-json', '--verbose', '--include-hook-events',
     '--model', model, '--effort', 'low', '--max-turns', '20', '--max-budget-usd', '5',
     '--permission-mode', 'acceptEdits', '--permission-prompts', 'none',
+    '--settings', fixture.guardSettings || path.join(fixture.base, 'guard-settings.json'),
     '--tools', 'Read,Glob,Grep,Edit,Write,Bash', '--allowedTools', permissions(fixture).join(','),
     '--disallowedTools', deniedPermissions(fixture).join(','),
     '--strict-mcp-config', ...(fixture.installation === 'plugin' ? ['--plugin-dir', fixture.root] : ['--mcp-config', fixture.mcpConfig]),
@@ -230,6 +357,7 @@ export function invocation(fixture, model, prompt, session, resume = false) {
 export function deniedPermissions(fixture) {
   const trees = ['bin', 'config', 'home', 'store', 'tmp', 'xdg-config', 'xdg-data', 'cache'].map(name => path.join(fixture.base, name) + '/**');
   const infrastructure = [...trees, fixture.validator, fixture.observations, fixture.mcpConfig,
+    fixture.guard || path.join(fixture.base, 'guard.mjs'), fixture.guardSettings || path.join(fixture.base, 'guard-settings.json'),
     path.join(fixture.base, 'validation.jsonl'), path.join(fixture.root, '**'),
     path.join(fixture.cwd, '.claude', '**'), path.join(fixture.cwd, '.mcp.json'), path.join(fixture.cwd, '.git', '**')];
   return [...['Edit', 'Write'].flatMap(tool => infrastructure.map(file => `${tool}(/${file})`)),
@@ -302,7 +430,7 @@ export function cliPreflight(config, fixture) {
   assert.equal(cliVersion(), config.version, 'CLI version mismatch');
   const help = execFileSync(config.binary, ['--help'], {cwd: fixture.cwd, env: fixture.env, encoding: 'utf8', timeout: 10000});
   for (const flag of ['--model', '--effort', '--max-budget-usd', '--permission-mode', '--allowedTools',
-    '--tools', '--disallowedTools', '--strict-mcp-config', '--mcp-config', '--plugin-dir', '--session-id', '--resume', '--permission-prompts',
+    '--tools', '--disallowedTools', '--settings', '--strict-mcp-config', '--mcp-config', '--plugin-dir', '--session-id', '--resume', '--permission-prompts',
     '--output-format', '--include-hook-events', '--verbose']) assert.ok(help.includes(flag), `unsupported required flag ${flag}`);
   assert.match(help, /Bash\(git \*\)/, 'CLI help must document bounded Bash permission syntax');
   // --max-turns is supported but hidden in 2.1.309. Probe the full argv without a prompt, never a model call.
@@ -372,7 +500,7 @@ function memoryCommand(fixture, words) {
   if (!words) return null;
   const entry = words[0] === 'node' ? words[1] : words[0];
   const operation = words[words[0] === 'node' ? 2 : 1];
-  const entries = ['punk-records', 'previously'].flatMap(alias => [alias, path.join(fixture.root, 'bin', alias)]);
+  const entries = ['punk-records', 'previously'].map(alias => words[0] === 'node' ? path.join(fixture.root, 'bin', alias) : alias);
   return entries.includes(entry) && ['ask', 'save'].includes(operation) ? operation : null;
 }
 
@@ -416,10 +544,12 @@ export function evidenceFor(fixture, launches) {
     calls: validatorCalls.map(call => ({id: call.id, isError: call.result?.is_error === true})), records: validationRecords};
   const accurate = memory => {
     const content = [memory.symptoms, memory.solution, ...(memory.attempts || [])].join('\n');
+    if (fixture.caseId === 'save-decision') return correctDecision(fixture, parseDecision(memory.solution))
+      && observedFinding(fixture, calls) && /validat|check|test|read|ticket/i.test(content);
     return memory.solution.includes(fixture.answer) && /empty.{0,24}\btrue\b|enable.*empty|empty.*enabled/i.test(memory.solution)
       && !/empty["']?\s*[:=]\s*false/i.test(memory.solution)
       && /compatib|reject|boundary/i.test(content) && /validat|check|test/i.test(content)
-      && (validator.observed || launches.some(launch => launch.findingEvidence));
+      && (validator.observed || observedFinding(fixture, calls));
   };
   const explicitSaves = calls.filter(call => call.name.endsWith('__memory_save')
     || call.name === 'Bash' && memoryCommand(fixture, shellWords(call.input?.command || '')) === 'save').length;
@@ -431,7 +561,7 @@ export function evidenceFor(fixture, launches) {
     ? fs.readFileSync(path.join(fixture.cwd, 'spelling.txt'), 'utf8') === 'compatibility\n'
     : config.route === fixture.answer && config.empty === true,
   validator, unchanged: JSON.stringify(sourceSnapshot(fixture)) === JSON.stringify(fixture.sourceBefore),
-  finding: response.includes(fixture.answer) && /empty/i.test(response) && launches.some(launch => launch.findingEvidence),
+  finding: decisionEvidence(fixture, response, calls),
   learned: relevant.map(memory => ({memoryId: memory.memoryId, title: memory.title, symptoms: memory.symptoms,
     solution: memory.solution, attempts: memory.attempts, accurate: accurate(memory)})),
   drafts: after.filter(memory => memory.tags.includes('auto')).map(memory => ({memoryId: memory.memoryId, title: memory.title})),
@@ -479,8 +609,7 @@ async function launch(config, fixture, prompt, session, resume) {
     hostAttachments: events.filter(event => event.type === 'hook_additional_context'
       || event.type === 'system' && event.subtype === 'hook_additional_context'),
     exposedTools: init?.tools || [], extraTools, mcpAvailable, modelMatches, protocolError,
-    findingEvidence: calls.some(call => ['Read', 'Bash'].includes(call.name) && !call.result?.is_error
-      && (String(call.input?.file_path || '').endsWith('ticket.md') || validatorCommand(fixture, call.input?.command))),
+    findingEvidence: observedFinding(fixture, calls),
     ok: processResult.code === 0 && !processResult.timedOut && !protocolError && !result?.is_error && Boolean(result)
       && modelMatches && mcpAvailable && extraTools.length === 0,
     failure: processResult.timedOut ? 'wall-clock timeout' : processResult.code !== 0 ? 'CLI exit/auth/setup failure'

@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {CASES, INSTALLATIONS, isolatedEnv, configuration, permissions, invocation, scoreCase,
-  createFixture, verifyFixture, runProcess, persist, evaluateCase, evidenceFor, deniedPermissions, attributedReceipt, shellWords, cliPreflight} from './helpers/agent-evaluation.js';
+  createFixture, verifyFixture, runProcess, persist, evaluateCase, evidenceFor, deniedPermissions, attributedReceipt, shellWords, cliPreflight,
+  guardTool, decisionEvidence} from './helpers/agent-evaluation.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const good = {validator: {observed: true, code: 0}, correct: true, unchanged: true,
@@ -102,7 +103,7 @@ test('dummy CLI preflight accepts hidden max-turns but rejects wrong versions an
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'eval-cli-'));
   t.after(() => fs.rmSync(base, {recursive: true, force: true}));
   const binary = path.join(base, 'claude');
-  const help = '--model --effort --max-budget-usd --permission-mode --allowedTools --disallowedTools --tools --strict-mcp-config --mcp-config --plugin-dir --session-id --resume --permission-prompts --output-format --include-hook-events --verbose Bash(git *)';
+  const help = '--model --effort --max-budget-usd --permission-mode --allowedTools --disallowedTools --settings --tools --strict-mcp-config --mcp-config --plugin-dir --session-id --resume --permission-prompts --output-format --include-hook-events --verbose Bash(git *)';
   fs.writeFileSync(binary, `#!${process.execPath}\nconst a=process.argv.slice(2);
 if(a[0]==='--version')console.log('2.1.309 (Claude Code)');
 else if(a[0]==='--help')console.log(${JSON.stringify(help)});
@@ -178,6 +179,90 @@ test('timeout and nonzero exit evidence persists outside disposable fixtures', a
   assert.equal(saved.timeout.timedOut, true);
   assert.equal(saved.failed.code, 7);
   assert.ok(!fs.readFileSync(file, 'utf8').includes('must-not-persist'));
+});
+
+test('trusted PreToolUse guard denies host/auth access and symlink escapes before native tools run', t => {
+  const fixture = createFixture({root: ROOT, installation: 'plugin', caseId: 'ack', attempt: 1});
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'outside-fixture-'));
+  t.after(() => {fs.rmSync(fixture.base, {recursive: true, force: true}); fs.rmSync(outside, {recursive: true, force: true});});
+  fs.writeFileSync(path.join(outside, '.credentials.json'), 'synthetic OAuth sentinel');
+  fs.symlinkSync(outside, path.join(fixture.cwd, 'escape'));
+  fs.symlinkSync(path.join(outside, 'not-created'), path.join(fixture.cwd, 'dangling'));
+  for (const [tool_name, tool_input] of [
+    ['Read', {file_path: path.join(outside, '.credentials.json')}],
+    ['Write', {file_path: path.join(outside, 'host.txt'), content: 'unsafe'}],
+    ['Read', {file_path: path.join(fixture.env.CLAUDE_CONFIG_DIR, '.credentials.json')}],
+    ['Read', {file_path: path.join(fixture.cwd, 'escape', '.credentials.json')}],
+    ['Write', {file_path: path.join(fixture.cwd, 'dangling'), content: 'unsafe'}],
+    ['Glob', {path: fixture.cwd, pattern: '../**/*'}],
+    ['Grep', {path: outside, pattern: 'sentinel'}],
+    ['Bash', {command: 'punk-records ask x | cat /etc/passwd'}],
+    ['Bash', {command: 'node previously save --title fake'}],
+    ['Bash', {command: `node ${fixture.validator}`, run_in_background: true}],
+    ['Write', {file_path: fixture.validator, content: 'unsafe'}],
+  ]) {
+    assert.equal(guardTool(fixture, {tool_name, tool_input}).permissionDecision, 'deny', tool_name + JSON.stringify(tool_input));
+    const native = spawnSync(process.execPath, [fixture.guard], {cwd: fixture.cwd, env: fixture.env,
+      input: JSON.stringify({tool_name, tool_input}), encoding: 'utf8'});
+    assert.equal(native.status, 0);
+    assert.equal(JSON.parse(native.stdout).hookSpecificOutput.permissionDecision, 'deny');
+  }
+  assert.equal(guardTool(fixture, {tool_name: 'Read', tool_input: {file_path: fixture.configFile}}).permissionDecision, 'allow');
+  assert.equal(guardTool(fixture, {tool_name: 'Bash', tool_input: {command: 'punk-records ask "safe query"'}}).permissionDecision, 'allow');
+  assert.equal(guardTool(fixture, {tool_name: 'Bash', tool_input: {command: `node ${fixture.root}/bin/previously ask "safe query"`}}).permissionDecision, 'allow');
+  assert.equal(fs.existsSync(path.join(outside, 'host.txt')), false);
+  const malformed = spawnSync(process.execPath, [fixture.guard], {cwd: fixture.cwd, env: fixture.env, input: 'invalid JSON', encoding: 'utf8'});
+  assert.equal(malformed.status, 2, 'guard parser failure must block rather than continue');
+  assert.equal(fs.existsSync(path.join(fixture.cwd, '.claude')), false, 'plugin guard must not add standalone installation');
+});
+
+test('complete no-edit snapshot detects new files, deletions and symlinks without following them', t => {
+  for (const mutation of ['create', 'delete', 'symlink']) {
+    const fixture = createFixture({root: ROOT, installation: 'standalone-project', caseId: 'ack', attempt: 1});
+    t.after(() => fs.rmSync(fixture.base, {recursive: true, force: true}));
+    if (mutation === 'create') fs.writeFileSync(path.join(fixture.cwd, 'unexpected.txt'), 'unexpected');
+    if (mutation === 'delete') fs.unlinkSync(path.join(fixture.cwd, 'spelling.txt'));
+    if (mutation === 'symlink') fs.symlinkSync('/unreadable-host-location', path.join(fixture.cwd, 'unexpected-link'));
+    const evidence = evidenceFor(fixture, [{ok: true, response: 'Thanks', calls: []}]);
+    assert.equal(evidence.unchanged, false, mutation);
+    assert.equal(scoreCase('ack', evidence).pass, false, mutation);
+  }
+});
+
+test('decisions require exact typed selection and a matching successful evidence result', t => {
+  const fixture = createFixture({root: ROOT, installation: 'standalone-project', caseId: 'no-save', attempt: 2});
+  t.after(() => fs.rmSync(fixture.base, {recursive: true, force: true}));
+  const ticket = fs.readFileSync(path.join(fixture.cwd, 'ticket.md'), 'utf8');
+  const call = {id: 'read-ticket', name: 'Read', input: {file_path: path.join(fixture.cwd, 'ticket.md')},
+    result: {tool_use_id: 'read-ticket', is_error: false, content: ticket}};
+  const response = JSON.stringify({route: fixture.answer, empty: true, reason: fixture.reason});
+  assert.equal(decisionEvidence(fixture, response, [call]), true);
+  for (const wrong of [`Do not choose ${fixture.answer} or enable empty; keep broken`,
+    JSON.stringify({route: 'broken', empty: false, reason: fixture.reason}),
+    JSON.stringify({route: fixture.answer, empty: 'true', reason: fixture.reason})]) {
+    assert.equal(decisionEvidence(fixture, wrong, [call]), false);
+  }
+  for (const result of [undefined, {...call.result, is_error: true}, {...call.result, content: 'unrelated text'},
+    {...call.result, tool_use_id: 'another-request'}]) assert.equal(decisionEvidence(fixture, response, [{...call, result}]), false);
+  const evidence = evidenceFor(fixture, [{ok: true, response, calls: [call]}]);
+  assert.equal(scoreCase('no-save', evidence).pass, true);
+});
+
+test('saved decision readback rejects negated prose and requires the exact structured choice', t => {
+  const fixture = createFixture({root: ROOT, installation: 'standalone-project', caseId: 'save-decision', attempt: 1});
+  t.after(() => fs.rmSync(fixture.base, {recursive: true, force: true}));
+  const call = {id: 'read-ticket', name: 'Read', input: {file_path: path.join(fixture.cwd, 'ticket.md')},
+    result: {tool_use_id: 'read-ticket', content: fs.readFileSync(path.join(fixture.cwd, 'ticket.md'), 'utf8')}};
+  const response = JSON.stringify({route: fixture.answer, empty: true, reason: fixture.reason});
+  let ref;
+  for (const [solution, expected] of [[`Do not choose ${fixture.answer} or set empty=true; checked compatibility note`, false], [response, true]]) {
+    const input = {type: 'decision', title: 'Compatibility selection', symptoms: 'Checked ticket.md compatibility evidence', solution, ...(ref ? {ref} : {})};
+    const output = execFileSync(process.execPath, ['--input-type=module', '-e',
+      `import {saveMemory} from ${JSON.stringify(path.join(ROOT, 'lib', 'save.js'))};let raw='';for await(const chunk of process.stdin)raw+=chunk;console.log(JSON.stringify(saveMemory(JSON.parse(raw),{cwd:process.cwd(),scope:'repo'})));`],
+    {cwd: fixture.cwd, env: fixture.env, input: JSON.stringify(input), encoding: 'utf8'});
+    ref = JSON.parse(output).memoryId;
+    assert.equal(scoreCase('save-decision', evidenceFor(fixture, [{ok: true, calls: [call], response}])).pass, expected);
+  }
 });
 
 test('live project behavior: three fresh attempts per atomic case',
