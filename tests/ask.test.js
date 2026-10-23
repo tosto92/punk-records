@@ -178,9 +178,10 @@ test('unexpected scanner exceptions fail closed with bounded count-only diagnost
 });
 
 test('real NOVA save evidence gates shared retrieval before limiting', t => {
-  const realPython = process.env.PUNK_RECORDS_PYTHON;
+  const names = ['PUNK_RECORDS_PYTHON', 'PREVIOUSLY_PYTHON'];
+  const realPython = Object.fromEntries(names.map(name => [name, process.env[name]]));
   const f = securityFixture(t);
-  if (realPython === undefined) delete process.env.PUNK_RECORDS_PYTHON; else process.env.PUNK_RECORDS_PYTHON = realPython;
+  for (const name of names) if (realPython[name] === undefined) delete process.env[name]; else process.env[name] = realPython[name];
   const options = {cwd: f.home, scope: 'global'};
   const safe = saveMemory({type: 'note', title: 'deploy safe', solution: 'restart safely'}, options);
   const blocked = saveMemory({type: 'note', title: 'deploy quarantined title', tags: ['deploy'],
@@ -190,6 +191,7 @@ test('real NOVA save evidence gates shared retrieval before limiting', t => {
   const logs = []; t.mock.method(console, 'error', line => logs.push(line));
   assert.equal(search({query: 'deploy', limit: 1, resolved: f.resolved})[0].memoryId, safe.memoryId);
   assert.doesNotMatch(logs.join('\n'), /quarantined|QUARANTINED|Ignore/);
+  assert.deepEqual(f.calls(), [], 'real NOVA saves and search must never use the fixture scanner');
 });
 
 test('automatic eligibility precedes limiting and keeps promoted activity and symptom-only notes', t => {
