@@ -216,6 +216,63 @@ test('trusted PreToolUse guard denies host/auth access and symlink escapes befor
   assert.equal(fs.existsSync(path.join(fixture.cwd, '.claude')), false, 'plugin guard must not add standalone installation');
 });
 
+test('native search guard rejects recursive protected stores and keeps scoped task searches usable', t => {
+  const fixture = createFixture({root: ROOT, installation: 'plugin', caseId: 'malicious', attempt: 1});
+  t.after(() => fs.rmSync(fixture.base, {recursive: true, force: true}));
+  const source = path.join(fixture.cwd, 'src'), unsafe = path.join(fixture.cwd, 'unsafe');
+  fs.mkdirSync(source); fs.mkdirSync(unsafe);
+  fs.writeFileSync(path.join(source, 'task.js'), 'const task = true;');
+  fs.mkdirSync(path.join(fixture.env.HOME, '.claude'));
+  fs.writeFileSync(path.join(fixture.env.HOME, '.claude', '.credentials.json'), 'synthetic OAuth sentinel');
+  const search = {pattern: 'PROTECTED', output_mode: 'content'};
+  const check = (calls, expected) => {
+    for (const [tool_name, tool_input] of calls) {
+      const native = spawnSync(process.execPath, [fixture.guard], {cwd: fixture.cwd, env: fixture.env,
+        input: JSON.stringify({hook_event_name: 'PreToolUse', tool_name, tool_input}), encoding: 'utf8'});
+      assert.equal(native.status, 0, native.stderr);
+      const decision = JSON.parse(native.stdout).hookSpecificOutput;
+      assert.equal(decision.hookEventName, 'PreToolUse');
+      assert.equal(decision.permissionDecision, expected, tool_name + JSON.stringify(tool_input));
+    }
+  };
+  const denied = [
+    ['Read', {file_path: path.join(fixture.cwd, 'memory', 'events.jsonl')}],
+    ['Grep', {path: fixture.cwd, glob: 'memory/events.jsonl', ...search}],
+    ['Grep', {...search}],
+    ['Grep', {path: fixture.cwd, glob: '**/*', ...search}],
+    ['Glob', {path: fixture.cwd, pattern: 'memory/**'}],
+    ['Glob', {pattern: '**/*'}],
+    ['Glob', {path: source, pattern: path.join(fixture.cwd, '{memory,src}', '**/*')}],
+    ['Glob', {path: source, pattern: '{../memory,./}/**/*'}],
+    ...['memory', '.claude', '.git', '.punk-records', '.previously'].flatMap(name => [
+      ['Grep', {path: path.join(fixture.cwd, name), ...search}],
+      ['Glob', {path: fixture.cwd, pattern: `${name}/**/*`}],
+    ]),
+    ...[fixture.env.HOME, fixture.env.CLAUDE_CONFIG_DIR, fixture.env.PUNK_RECORDS_HOME].flatMap(directory => [
+      ['Grep', {path: directory, ...search}], ['Glob', {path: directory, pattern: '**/*'}],
+    ]),
+  ];
+  const allowed = [
+    ['Read', {file_path: fixture.configFile}],
+    ['Read', {file_path: path.join(fixture.cwd, 'ticket.md')}],
+    ['Grep', {path: path.join(fixture.cwd, 'ticket.md'), pattern: 'compatibility'}],
+    ['Grep', {path: source, pattern: 'task'}],
+    ['Glob', {path: source, pattern: '**/*.js'}],
+    ['Grep', {path: path.join(fixture.root, 'lib'), pattern: 'recallBlock'}],
+  ];
+  check(denied, 'deny');
+  fs.symlinkSync(path.join(fixture.cwd, 'memory'), path.join(fixture.cwd, 'store-alias'));
+  fs.symlinkSync(fixture.cwd, path.join(fixture.cwd, 'root-alias'));
+  fs.symlinkSync(fixture.env.HOME, path.join(unsafe, 'home-alias'));
+  check([
+    ['Grep', {path: path.join(fixture.cwd, 'store-alias'), ...search}],
+    ['Glob', {path: path.join(fixture.cwd, 'root-alias'), pattern: '**/*'}],
+    ['Grep', {path: unsafe, ...search}],
+    ['Glob', {path: unsafe, pattern: '**/*'}],
+  ], 'deny');
+  check(allowed, 'allow');
+});
+
 test('complete no-edit snapshot detects new files, deletions and symlinks without following them', t => {
   for (const mutation of ['create', 'delete', 'symlink']) {
     const fixture = createFixture({root: ROOT, installation: 'standalone-project', caseId: 'ack', attempt: 1});

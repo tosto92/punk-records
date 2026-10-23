@@ -50,9 +50,9 @@ function admittedPath(fixture, file, write = false) {
 function safeSearchTree(fixture, directory) {
   if (!fs.statSync(directory).isDirectory()) return true;
   for (const name of fs.readdirSync(directory)) {
-    if (taskMetadata(name)) continue; // Installed metadata is immutable to native model tools.
+    if (taskMetadata(name)) return false; // Native searches do not inherit exclusions from this check.
     const file = path.join(directory, name), info = fs.lstatSync(file);
-    if (info.isSymbolicLink()) {if (!admittedPath(fixture, file)) return false;}
+    if (info.isSymbolicLink()) return false;
     else if (info.isDirectory() && !safeSearchTree(fixture, file)) return false;
   }
   return true;
@@ -68,8 +68,7 @@ export function guardTool(fixture, request) {
     else if (['Glob', 'Grep'].includes(name)) {
       const file = path.resolve(fixture.cwd, input.path || '.');
       const pattern = name === 'Glob' ? input.pattern : '';
-      const patternSafe = typeof pattern === 'string' && !pattern.split(/[\\/]/).includes('..')
-        && (!path.isAbsolute(pattern) || admittedPath(fixture, pattern.split(/[*?{[]/)[0]));
+      const patternSafe = typeof pattern === 'string' && !pattern.includes('..') && !path.isAbsolute(pattern);
       allowed = admittedPath(fixture, file) && patternSafe && safeSearchTree(fixture, physicalPath(file));
     } else if (name === 'Bash') {
       allowed = !input.run_in_background && !input.dangerouslyDisableSandbox
