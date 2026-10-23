@@ -85,12 +85,14 @@ test('direct entrypoint registers one plugin; V1 sessions and hooks are isolated
 
 test('V1 recall injects strings and does not capture shell, foreign or deleted sessions', TS, async t => {
   const {cwd, plugin, memories} = await fixture(t);
-  saveMemory({type: 'solved', title: 'auth fix', solution: 'rotate token'}, {cwd});
+  const saved = saveMemory({type: 'solved', title: 'auth fix', solution: 'rotate token'}, {cwd});
   const hooks = await plugin.server({directory: cwd});
   await hooks['chat.message']({sessionID: 'A'}, {parts: [{type: 'text', text: 'auth fix'}]});
   const output = {system: []}; await hooks['experimental.chat.system.transform']({sessionID: 'A'}, output);
   assert.equal(typeof output.system[0], 'string'); assert.match(output.system[0], /rotate token/);
   assert.ok(output.system[0].length <= 1500);
+  assert.ok(output.system[0].endsWith('\n</punk-records>'));
+  assert.ok(output.system[0].includes(saved.memoryId));
   await afterV1(hooks, 'A', path.join(cwd, 'shell.js'), 'bash');
   await hooks.event({event: {type: 'session.created', properties: {info: {id: 'foreign', directory: path.dirname(cwd)}}}});
   await afterV1(hooks, 'foreign', path.join(cwd, 'foreign.js')); await idleV1(hooks, 'foreign');
@@ -102,13 +104,15 @@ test('V1 recall injects strings and does not capture shell, foreign or deleted s
 
 test('V2 uses native completed tool output and background wait; context uses text objects', TS, async t => {
   const {cwd, plugin, memories} = await fixture(t);
-  saveMemory({type: 'solved', title: 'auth fix', solution: 'rotate token'}, {cwd});
+  const saved = saveMemory({type: 'solved', title: 'auth fix', solution: 'rotate token'}, {cwd});
   const {ctx, hooks, waits, registrations} = context(cwd);
   const cleanup = await plugin.setup(ctx); t.after(cleanup);
   await hooks.prompt(promptV2('A', 'auth fix')); await hooks.prompt(promptV2('B', 'fix B'));
   const output = {sessionID: 'A', system: [], messages: [], options: {}, tools: {}, agent: 'build', model: {providerID: 'local', id: 'test'}};
   await hooks.context(output);
   assert.equal(output.system[0].type, 'text'); assert.match(output.system[0].text, /rotate token/);
+  assert.ok(output.system[0].text.endsWith('\n</punk-records>'));
+  assert.ok(output.system[0].text.includes(saved.memoryId));
   await hooks['execute.after'](afterV2('A', path.join(cwd, 'a.js')));
   await hooks['execute.after'](afterV2('B', path.join(cwd, 'b.js')));
   assert.equal(waits.size, 2); assert.equal(memories().length, 1);
