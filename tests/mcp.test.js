@@ -104,7 +104,8 @@ function writeScope(dir, memories) {
 function startMcp({ home, cwd, args = [] }) {
   const child = spawn(process.execPath, [path.join(ROOT, "bin", "previously"), "mcp", ...args], {
     cwd,
-    env: { ...process.env, PREVIOUSLY_HOME: home },
+    env: { ...process.env, PUNK_RECORDS_HOME: home, PREVIOUSLY_HOME: home,
+      PUNK_RECORDS_SECURITY: '0', PREVIOUSLY_SECURITY: '0', PUNK_RECORDS_SYNTHESIS: '0', PREVIOUSLY_SYNTHESIS: '0' },
     stdio: ["pipe", "pipe", "pipe"],
   });
   let buf = "";
@@ -288,4 +289,25 @@ test('MCP memory_find shares the gate and approval claims expose no approval too
   const saved = call('tools/call', {name: 'memory_save', arguments: {type: 'note', title: 'committed deploy', approved: true}});
   const result = JSON.parse(saved.result.content[0].text);
   assert.equal(result.ok, true); assert.equal(result.written, 1); assert.equal(result.security.status, 'incomplete');
+});
+
+
+test('MCP memory_find validates full strictly and returns admitted full bodies', t => {
+  const f = securityFixture(t);
+  const solution = 'first\nsecond\nthird\nTAIL-CONDITION';
+  writeSecurityStore(f.home, [{...benign, solution}, attack]);
+  const ctx = {cwd: f.home, flagExplicit: 'global'};
+  const call = arguments_ => handleMessage({jsonrpc: '2.0', id: 1, method: 'tools/call', params: {
+    name: 'memory_find', arguments: {query: 'deploy', ...arguments_}}}, ctx);
+  for (const full of ['true', null, 0, [], {}]) assert.equal(call({full}).error?.code, -32602);
+  const tools = handleMessage({jsonrpc: '2.0', id: 2, method: 'tools/list'}, ctx).result.tools;
+  assert.equal(tools.length, 3);
+  assert.deepEqual(tools.find(t => t.name === 'memory_find').inputSchema.properties.full, {type: 'boolean'});
+  const short = JSON.parse(call({}).result.content[0].text);
+  assert.deepEqual(JSON.parse(call({full: false}).result.content[0].text), short);
+  const hits = JSON.parse(call({full: true}).result.content[0].text);
+  assert.deepEqual(hits.map(({memory, ...hit}) => hit), short);
+  assert.equal(hits[0].memory.memoryId, benignId);
+  assert.equal(hits[0].memory.solution, solution);
+  assert.doesNotMatch(JSON.stringify(hits), /QUARANTINED|_store|_fresh|scanner/);
 });

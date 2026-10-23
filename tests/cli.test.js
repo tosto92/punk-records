@@ -81,3 +81,31 @@ test('--help lists every command, --version matches package.json, unknown comman
   assert.equal(bad.status, 2);
   assert.match(bad.stderr, /unknown command 'nope'.*--help/);
 });
+
+
+test('both CLI aliases support full before or after query and preserve default output', t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-cli-full-'));
+  t.after(() => fs.rmSync(home, {recursive: true, force: true}));
+  const env = {...process.env, PUNK_RECORDS_HOME: home, PREVIOUSLY_HOME: home,
+    PUNK_RECORDS_SECURITY: '0', PREVIOUSLY_SECURITY: '0', PUNK_RECORDS_SYNTHESIS: '0', PREVIOUSLY_SYNTHESIS: '0'};
+  for (const alias of ['punk-records', 'previously']) {
+    const cli = path.resolve(import.meta.dirname, '../bin', alias);
+    const run = args => spawnSync(process.execPath, [cli, ...args], {cwd: home, env, encoding: 'utf8'});
+    const saved = run(['save', '--global', '--type', 'solved', '--title', 'cli zebra', '--solution', 'one\ntwo\nthree\nTAIL-CONDITION']);
+    assert.equal(saved.status, 0, saved.stderr);
+    const memoryId = JSON.parse(saved.stdout).memoryId;
+    const ordinary = run(['ask', 'zebra']);
+    assert.equal(ordinary.status, 0, ordinary.stderr);
+    assert.doesNotMatch(ordinary.stdout, /TAIL-CONDITION/);
+    for (const args of [['ask', '--full', 'zebra'], ['ask', 'zebra', '--full']]) {
+      const result = run(args); assert.equal(result.status, 0, result.stderr);
+      const hits = JSON.parse(result.stdout);
+      assert.equal(hits[0].memory.memoryId, memoryId);
+      assert.match(hits[0].memory.solution, /TAIL-CONDITION/);
+    }
+    assert.equal(run(['ask', 'unmatched-query', '--full']).stdout, '[]\n');
+    assert.equal(run(['ask', 'unmatched-query']).stdout, '');
+    for (const args of [['ask', '--full'], ['ask', 'zebra', '--unknown']]) assert.equal(run(args).status, 2);
+    assert.match(run(['--help']).stdout, /ask <query>.*\[--full\]/);
+  }
+});

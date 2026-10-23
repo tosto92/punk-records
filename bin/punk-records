@@ -81,11 +81,13 @@ function cmdBuild(args) {
 
 function cmdAsk(args) {
   let query = null;
+  let full = false;
   let limit = 5;
   let scope = "all";
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === "--limit") limit = Number(args[++i]);
+    if (a === "--full") full = true;
+    else if (a === "--limit") limit = Number(args[++i]);
     else if (a === "--scope") scope = args[++i];
     else if (a.startsWith("--")) {
       console.error(`punk-records: unknown flag: ${a}`);
@@ -97,7 +99,7 @@ function cmdAsk(args) {
     }
   }
   if (!query || !Number.isInteger(limit) || limit < 1) {
-    console.error('usage: punk-records ask "<q>" [--limit 5] [--scope global|local|all]');
+    console.error('usage: punk-records ask "<q>" [--limit 5] [--scope global|local|all] [--full]');
     process.exit(2);
   }
   if (!["global", "local", "all"].includes(scope)) {
@@ -112,8 +114,9 @@ function cmdAsk(args) {
     console.error(err.message);
     process.exit(2);
   }
-  const hits = search({ query, limit, scope, resolved });
-  if (hits.length) console.log(formatHits(hits));
+  const hits = search({ query, limit, scope, resolved, full });
+  if (full) console.log(JSON.stringify(hits));
+  else if (hits.length) console.log(formatHits(hits));
 }
 
 function cmdCheck(args) {
@@ -156,8 +159,8 @@ usage: punk-records <command> [flags]
 
   init [--global|--local] [--agents opencode,claude,codex] [--opencode-api v1|v2] [--dry-run]
                      wire hooks, MCP server and skill (repo, or every repo with --global)
-  ask <query> [--limit n] [--scope local|global|all]
-                     recall memories matching symptoms, errors or file names
+  ask <query> [--limit n] [--scope local|global|all] [--full]
+                     recall memories matching symptoms, errors or file names (--full: JSON bodies)
   save --type <solved|attempt_failed|decision|note> --title <s> [--symptoms s] [--solution s]
        [--attempt a]... [--files f]... [--tags a,b] [--ref slug] [--global|--local]
                      save a memory (or update one with --ref)
