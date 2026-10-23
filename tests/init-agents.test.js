@@ -13,6 +13,7 @@ const BIN = path.join(ROOT, "bin", "punk-records");
 const SKILL = path.join(ROOT, "skills", "previously");
 const COMMAND = path.join(ROOT, "commands", "previously-save.md");
 const EVENTS = ["UserPromptSubmit", "PostToolUse", "Stop"];
+const CLAUDE_EVENTS = ["SessionStart", ...EVENTS];
 
 // Throwaway HOME, stores and repo per test; agent dirs resolve inside HOME.
 function sandbox(t) {
@@ -21,12 +22,13 @@ function sandbox(t) {
   fs.mkdirSync(repo);
   fs.mkdirSync(home);
   execFileSync("git", ["init", "-q"], { cwd: repo });
-  const keys = ["HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "PREVIOUSLY_HOME", "PREVIOUSLY_CONFIG", "PREVIOUSLY_PLUGINS", "PREVIOUSLY_SKILLS"];
+  const keys = ["HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "PREVIOUSLY_HOME", "PREVIOUSLY_CONFIG", "PREVIOUSLY_PLUGINS", "PREVIOUSLY_SKILLS", "PUNK_RECORDS_HOME", "PUNK_RECORDS_CONFIG", "PUNK_RECORDS_PLUGINS", "PUNK_RECORDS_SKILLS"];
   const prev = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   Object.assign(process.env, {
     HOME: home, PREVIOUSLY_HOME: path.join(root, "store"), PREVIOUSLY_CONFIG: path.join(root, "oc.json"),
     PREVIOUSLY_PLUGINS: path.join(root, "plugins"), PREVIOUSLY_SKILLS: path.join(root, "oc-skills"),
   });
+  for (const name of ["HOME", "CONFIG", "PLUGINS", "SKILLS"]) delete process.env[`PUNK_RECORDS_${name}`];
   delete process.env.CLAUDE_CONFIG_DIR;
   delete process.env.CODEX_HOME;
   t.after(() => {
@@ -81,8 +83,10 @@ test("repo init wires Claude Code: MCP, hooks, CLAUDE.md, skill, command", (t) =
   initRepo({ cwd: repo, agents: ["claude"] });
   assert.deepEqual(read(path.join(repo, ".mcp.json")).mcpServers["punk-records"], { type: "stdio", command: "node", args: [BIN, "mcp"] });
   const settings = read(path.join(repo, ".claude", "settings.json"));
-  for (const e of EVENTS) assert.deepEqual(commandsOf(settings, e), [hookCommand("claude", e)]);
+  for (const e of CLAUDE_EVENTS) assert.deepEqual(commandsOf(settings, e), [hookCommand("claude", e)]);
   assert.equal(hookCommand("claude", "Stop"), "previously hook claude Stop");
+  assert.equal(settings.hooks.SessionStart[0].matcher, undefined);
+  assert.equal(settings.hooks.SessionStart[0].hooks[0].timeout, 10);
   assert.equal(settings.hooks.PostToolUse[0].matcher, "Write|Edit|MultiEdit|NotebookEdit");
   assert.match(fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8"), /<!-- punk-records:start -->/);
   assert.equal(fs.readlinkSync(path.join(repo, ".claude", "skills", "punk-records")), path.join(ROOT, "skills", "punk-records"));
@@ -117,7 +121,7 @@ test("init upgrades owned legacy Claude and Codex entries without duplicate hook
   assert.deepEqual(Object.keys(mcp).sort(), ["foreign", "punk-records"]);
   assert.equal(mcp["punk-records"].args[0], BIN);
   const settings = read(path.join(repo, ".claude", "settings.json"));
-  for (const event of EVENTS) assert.deepEqual(commandsOf(settings, event), [hookCommand("claude", event)]);
+  for (const event of CLAUDE_EVENTS) assert.deepEqual(commandsOf(settings, event), [hookCommand("claude", event)]);
   assert.match(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /\[mcp_servers\.punk-records\]/);
   assert.doesNotMatch(fs.readFileSync(path.join(repo, ".codex", "config.toml"), "utf8"), /# previously:|\[mcp_servers\.previously\]/);
   const agents = fs.readFileSync(path.join(repo, "AGENTS.md"), "utf8");
@@ -323,6 +327,7 @@ test("global init wires Codex: hooks.json, config.toml block, skill", (t) => {
   initRepo({ cwd: repo, explicit: "global", agents: ["codex"] });
   const hooks = read(path.join(dir, "hooks.json"));
   for (const e of EVENTS) assert.deepEqual(commandsOf(hooks, e), [hookCommand("codex", e)]);
+  assert.equal(hooks.hooks.SessionStart, undefined);
   assert.equal(hooks.hooks.PostToolUse[0].matcher, MATCHERS.codex);
   const text = fs.readFileSync(path.join(dir, "config.toml"), "utf8");
   assert.equal(text, `${toml}\n${block()}`);
@@ -502,4 +507,28 @@ test("a file where a config dir should be skips that target with a warning, not 
   const warned = errors.mock.calls.map((c) => c.arguments[0]).filter((m) => /is not a directory/.test(m));
   assert.ok(warned.some((m) => m.includes(path.join(repo, ".codex"))), warned.join("\n"));
   assert.ok(warned.some((m) => m.includes(path.join(home, ".codex"))), warned.join("\n"));
+});
+
+test('Claude SessionStart malformed config aborts before writes', t => {
+  const {root, repo} = sandbox(t);
+  fs.mkdirSync(path.join(repo, '.claude'));
+  const config = path.join(repo, '.claude', 'settings.json');
+  fs.writeFileSync(config, JSON.stringify({hooks: {SessionStart: {}}}));
+  const before = fs.readFileSync(config, 'utf8');
+  const tree = fs.readdirSync(root, {recursive: true}).sort();
+  assert.throws(() => initRepo({cwd: repo, agents: ['claude']}), /hooks.SessionStart.*array/);
+  assert.deepEqual(fs.readdirSync(root, {recursive: true}).sort(), tree);
+  assert.equal(fs.readFileSync(config, 'utf8'), before);
+  assert.equal(fs.existsSync(path.join(repo, 'memory')), false);
+  assert.equal(fs.existsSync(path.join(repo, 'CLAUDE.md')), false);
+});
+
+test('local instruction guidance matches static workflow and retains absolute CLI fallback', async t => {
+  const {WORKFLOW_GUIDANCE} = await import('../lib/workflow.js');
+  const {repo} = sandbox(t);
+  initRepo({cwd: repo, agents: ['claude']});
+  const text = fs.readFileSync(path.join(repo, 'CLAUDE.md'), 'utf8');
+  assert.ok(text.includes(WORKFLOW_GUIDANCE));
+  assert.ok(WORKFLOW_GUIDANCE.length <= 1000);
+  assert.ok(text.includes(`node ${BIN} ask`));
 });

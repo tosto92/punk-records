@@ -59,3 +59,25 @@ test("previously skill supplies the protected memory review workflow", () => {
   assert.match(src, /MCP.*approval/i);
   assert.match(src, /unconfigured installs are unprotected/i);
 });
+
+for (const name of ['punk-records', 'previously']) {
+  test(`${name} starts with concise recall/save procedure and teaches full retrieval`, () => {
+    const src = fs.readFileSync(path.join(root, 'skills', name, 'SKILL.md'), 'utf8');
+    assert.ok(src.indexOf('## Workflow') < src.indexOf('## Recall'));
+    for (const phrase of ['--full --limit 1', 'full: true', 'Activity drafts are not learned solutions', 'reference data', 'validation']) assert.ok(src.includes(phrase), phrase);
+    assert.match(src, /excluded from automatic recall/);
+    assert.match(src, /searchable explicitly/);
+    assert.doesNotMatch(src, /never outrank curated/);
+    assert.match(src, /PUNK_RECORDS_SECURITY=1/);
+    assert.match(src, /--ref claude-code-session-/);
+    const command = fs.readFileSync(path.join(root, 'commands', `${name}-save.md`), 'utf8');
+    assert.match(command, /existing memory/);
+    assert.match(command, /validation/);
+    assert.match(command, /--full --limit 1/);
+  });
+}
+
+test('canonical and compatibility skills keep identical workflow bodies', () => {
+  const body = name => fs.readFileSync(path.join(root, 'skills', name, 'SKILL.md'), 'utf8').split('# Punk Records')[1];
+  assert.equal(body('punk-records'), body('previously'));
+});

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {handleHook, spoolPath, RECALL_OUTPUT} from '../lib/hook.js';
+import {WORKFLOW_GUIDANCE} from '../lib/workflow.js';
 import {saveMemory} from '../lib/save.js';
 import {loadMemories} from '../lib/build.js';
 import {collectMemories, contextGraph} from '../lib/graph.js';
@@ -18,7 +19,10 @@ function fixture(t) {
   const cwd = path.join(root, 'repo');
   fs.mkdirSync(cwd);
   execFileSync('git', ['init', '-q'], {cwd});
-  const prev = {PREVIOUSLY_HOME: process.env.PREVIOUSLY_HOME, PREVIOUSLY_AUTOSAVE: process.env.PREVIOUSLY_AUTOSAVE};
+  const keys = ['PUNK_RECORDS_HOME', 'PREVIOUSLY_HOME', 'PUNK_RECORDS_AUTOSAVE', 'PREVIOUSLY_AUTOSAVE'];
+  const prev = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  delete process.env.PUNK_RECORDS_HOME;
+  delete process.env.PUNK_RECORDS_AUTOSAVE;
   process.env.PREVIOUSLY_HOME = path.join(root, 'global');
   delete process.env.PREVIOUSLY_AUTOSAVE;
   t.after(() => {
@@ -214,4 +218,44 @@ test('recall still works when the spool dir is unusable', async t => {
   const out = await handleHook('claude', 'UserPromptSubmit', ev(cwd, {prompt: 'zebra quartz deploy'}));
   assert.match(out.hookSpecificOutput.additionalContext, /Zebra quartz deploy gotcha/);
   assert.equal(console.error.mock.callCount(), 1);
+});
+
+for (const source of ['startup', 'resume', 'clear', 'compact']) {
+  test(`Claude SessionStart ${source} emits static guidance without store access`, async t => {
+    const {root, cwd, cli} = fixture(t);
+    const previous = process.env.PUNK_RECORDS_AUTOSAVE;
+    process.env.PUNK_RECORDS_AUTOSAVE = '0';
+    t.after(() => { if (previous === undefined) delete process.env.PUNK_RECORDS_AUTOSAVE; else process.env.PUNK_RECORDS_AUTOSAVE = previous; });
+    const stale = path.join(root, 'global', 'spool', 'stale.jsonl');
+    fs.mkdirSync(path.dirname(stale), {recursive: true});
+    fs.writeFileSync(stale, 'untouched sentinel');
+    fs.utimesSync(stale, new Date(0), new Date(0));
+    const snapshot = () => fs.readdirSync(root, {recursive: true}).sort().map(name => {
+      const file = path.join(root, name);
+      const stat = fs.statSync(file);
+      return [name, stat.mtimeMs, stat.isFile() ? fs.readFileSync(file, 'hex') : null];
+    });
+    const before = snapshot();
+    const fail = () => { throw new Error('SessionStart must not access memories'); };
+    const input = ev(cwd, {source, hook_event_name: 'SessionStart'});
+    const out = await handleHook('claude', 'SessionStart', input, {load: fail, save: fail});
+    assert.equal(out?.hookSpecificOutput.hookEventName, 'SessionStart');
+    const guidance = out.hookSpecificOutput.additionalContext;
+    assert.equal(guidance, WORKFLOW_GUIDANCE);
+    assert.ok(guidance.length <= 1000);
+    assert.match(guidance, /--full/);
+    assert.doesNotMatch(guidance, /<punk-records>/);
+    const res = cli('claude', 'SessionStart', input);
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(JSON.parse(res.stdout), out);
+    assert.deepEqual(snapshot(), before);
+    assert.equal(await handleHook('codex', 'SessionStart', input, {load: fail, save: fail}), null);
+  });
+}
+
+test('SessionStart rejects unsupported source and invalid session', async t => {
+  const {cwd} = fixture(t);
+  for (const input of [ev(cwd, {source: 'unexpected'}), {source: 'startup', session_id: '../bad'}]) {
+    assert.equal(await handleHook('claude', 'SessionStart', input), null);
+  }
 });

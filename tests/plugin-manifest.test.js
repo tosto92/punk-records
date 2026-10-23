@@ -34,17 +34,23 @@ test('plugin manifests agree with package.json and point at files that exist', (
 for (const agent of ['claude', 'codex']) {
   test(`${agent} plugin hooks cover every event with the right agent and matcher, and run`, t => {
     const {hooks} = json(`hooks/${agent}.json`);
-    assert.deepEqual(Object.keys(hooks), EVENTS);
+    const events = agent === 'claude' ? ['SessionStart', ...EVENTS] : EVENTS;
+    assert.deepEqual(Object.keys(hooks), events);
+    if (agent === 'claude') {
+      assert.equal(hooks.SessionStart[0].matcher, undefined);
+      assert.equal(hooks.SessionStart[0].hooks[0].timeout, 10);
+    }
     assert.equal(hooks.PostToolUse[0].matcher, MATCHERS[agent]);
     const home = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-plugin-'));
     t.after(() => fs.rmSync(home, {recursive: true, force: true}));
-    for (const event of EVENTS) {
+    for (const event of events) {
       const [{command}] = hooks[event][0].hooks;
       assert.equal(command, `node "\${CLAUDE_PLUGIN_ROOT}/bin/punk-records" hook ${agent} ${event}`);
-      const input = JSON.stringify({session_id: 's1', cwd: home, hook_event_name: event, prompt: 'hello'});
+      const input = JSON.stringify({session_id: 's1', cwd: home, hook_event_name: event, source: 'startup', prompt: 'hello'});
       const res = spawnSync('sh', ['-c', command], {input, encoding: 'utf8',
-        env: {...process.env, CLAUDE_PLUGIN_ROOT: ROOT, PREVIOUSLY_HOME: path.join(home, 'store')}});
+        env: {...process.env, CLAUDE_PLUGIN_ROOT: ROOT, PREVIOUSLY_HOME: path.join(home, 'store'), PUNK_RECORDS_HOME: path.join(home, 'store'), PUNK_RECORDS_AUTOSAVE: '0'}});
       assert.equal(res.status, 0, res.stderr);
+      if (event === 'SessionStart') assert.equal(JSON.parse(res.stdout).hookSpecificOutput.hookEventName, event);
     }
   });
 }
