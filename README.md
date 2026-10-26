@@ -114,6 +114,13 @@ Automatic recall omits activity drafts and raw native Markdown sources; explicit
 
 For complete details, use `punk-records ask "<query>" --full` (JSON array; add `--limit 1` to retrieve one result) or `memory_find({ query, full: true, limit: 1 })`. Full retrieval is explicit; MCP requires `full` to be a boolean. Ordinary CLI and MCP search defaults are unchanged.
 
+Git linked worktrees share the primary checkout's `memory/` and repository identity,
+including external and detached worktrees. Agent configuration and edited-file paths
+stay in the current checkout. Inner marker projects, nested repositories and submodules
+keep their own stores. An unavailable or unsupported primary checkout causes an error;
+repair its Git metadata before saving. Existing worktree-local stores are left untouched
+and are not automatically recovered or merged.
+
 ### From the command line
 
 ```sh
