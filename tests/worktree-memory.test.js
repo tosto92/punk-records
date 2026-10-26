@@ -221,3 +221,44 @@ test('shared destination symlinks are still refused without writing the target',
   assert.throws(() => saveMemory({type: 'note', title: 'must fail'}, {cwd: external}), /symlink/i);
   assert.equal(fs.existsSync(path.join(target, 'events.jsonl')), false);
 });
+
+
+test('dangling Git metadata fails local scopes before saving globally, but explicit global remains usable', t => {
+  const {root, repo} = fixture(t);
+  fs.rmSync(path.join(repo, '.git'), {recursive: true});
+  fs.symlinkSync(path.join(root, 'missing-metadata'), path.join(repo, '.git'), 'dir');
+  assert.throws(() => paths.resolveScopes({}, repo), /Git metadata unavailable/i);
+  assert.throws(() => paths.memoryRoot(repo), /Git metadata unavailable/i);
+  assert.throws(() => saveMemory({type: 'note', title: 'must fail'}, {cwd: repo}), /Git metadata unavailable/i);
+  assert.equal(fs.existsSync(path.join(root, 'global', 'events.jsonl')), false);
+  assert.doesNotThrow(() => saveMemory({type: 'note', title: 'explicit global survives'}, {cwd: repo, scope: 'global'}));
+  const marked = path.join(repo, 'marked'); fs.mkdirSync(marked); fs.writeFileSync(path.join(marked, paths.MARKER), '');
+  assert.equal(paths.resolveScopes({}, marked).repoRoot, marked);
+  saveMemory({type: 'note', title: 'independent marked project'}, {cwd: marked});
+  assert.ok(fs.existsSync(path.join(marked, 'memory', 'events.jsonl')));
+});
+
+test('default and local saves inside a bare Git repository fail without silently writing globally', t => {
+  const {root, repo, git} = fixture(t);
+  const bare = path.join(root, 'bare.git');
+  git(root, 'clone', '--bare', '-q', repo, bare);
+  assert.throws(() => paths.resolveScopes({}, bare), /bare.*repository|primary.*checkout/i);
+  for (const scope of [null, 'repo']) assert.throws(() => saveMemory({type: 'note', title: 'must fail'}, {cwd: bare, scope}), /bare.*repository|primary.*checkout/i);
+  assert.equal(fs.existsSync(path.join(root, 'global', 'events.jsonl')), false);
+  assert.equal(fs.existsSync(path.join(bare, 'memory')), false);
+  assert.doesNotThrow(() => saveMemory({type: 'note', title: 'explicit bare global'}, {cwd: bare, scope: 'global'}));
+});
+
+test('symlink aliases of linked checkout roots share public plain-repoRoot consumers', t => {
+  const {root, repo, external, store} = fixture(t);
+  const alias = path.join(root, 'linked-alias'); fs.symlinkSync(external, alias, 'dir');
+  const saved = saveMemory({type: 'solved', title: 'symlink shared evidence', solution: 'use primary'}, {cwd: repo});
+  assert.equal(paths.repoDir(alias), store);
+  assert.equal(search({query: 'symlink shared evidence', scope: 'local', resolved: {repoRoot: alias}})[0]?.memoryId, saved.memoryId);
+  buildAll({repoRoot: alias}, 'local');
+  assert.ok(fs.existsSync(path.join(store, 'INDEX.md')));
+  assert.equal(collectMemories({repoRoot: alias}, 'local')[0]?.memoryId, saved.memoryId);
+  assert.equal(fs.existsSync(path.join(external, 'memory')), false);
+  const marked = path.join(alias, 'marked'); fs.mkdirSync(marked); fs.writeFileSync(path.join(marked, paths.MARKER), '');
+  assert.equal(paths.repoDir(marked), path.join(marked, 'memory'));
+});
