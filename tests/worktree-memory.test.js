@@ -262,3 +262,30 @@ test('symlink aliases of linked checkout roots share public plain-repoRoot consu
   const marked = path.join(alias, 'marked'); fs.mkdirSync(marked); fs.writeFileSync(path.join(marked, paths.MARKER), '');
   assert.equal(paths.repoDir(marked), path.join(marked, 'memory'));
 });
+
+
+test('local init rejects the primary memory symlink before creating target events', t => {
+  const {root, repo, external} = fixture(t);
+  const target = path.join(root, 'unrelated-target'); fs.mkdirSync(target);
+  fs.writeFileSync(path.join(target, 'untouched.txt'), 'keep');
+  fs.symlinkSync(target, path.join(repo, 'memory'), 'dir');
+  assert.throws(() => initRepo({cwd: external, explicit: 'local', agents: ['opencode']}), /symlink/i);
+  assert.deepEqual(fs.readdirSync(target), ['untouched.txt']);
+  assert.equal(fs.readFileSync(path.join(target, 'untouched.txt'), 'utf8'), 'keep');
+  assert.equal(fs.existsSync(path.join(external, 'opencode.json')), false);
+});
+
+test('short checkout aliases preserve nearer explicit markers during scope resolution and save', t => {
+  const {root, repo, external, git} = fixture(t);
+  const longCheckout = path.join(root, 'a-long-physical-linked-checkout-directory');
+  git(repo, 'worktree', 'move', external, longCheckout);
+  const alias = path.join(root, 'a'); fs.symlinkSync(longCheckout, alias, 'dir');
+  const marked = path.join(alias, 'm'); fs.mkdirSync(marked);
+  fs.writeFileSync(path.join(marked, paths.MARKER), '');
+  const resolved = paths.resolveScopes({}, marked);
+  assert.equal(resolved.repoRoot, marked);
+  assert.equal(resolved.repoName, 'm');
+  saveMemory({type: 'note', title: 'independent aliased marker'}, {cwd: marked});
+  assert.equal(loadMemories(path.join(marked, 'memory')).memories[0]?.title, 'independent aliased marker');
+  assert.equal(fs.existsSync(path.join(repo, 'memory')), false);
+});
