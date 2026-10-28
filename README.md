@@ -12,10 +12,10 @@ shared knowledge in *One Piece*. It saves useful fixes and decisions, then
 recalls them when they matter in **Claude Code**, **Codex** and **OpenCode**.
 
 - Core memory runs on Node with zero npm dependencies, no LLM calls, no API key.
-- Everything stays on your machine: no network access, no telemetry.
+- Core storage and recall stay on your machine: no network access, no telemetry.
 - Plain files: an append-only `events.jsonl` you can read, grep and commit.
 
-Optional [incremental synthesis](docs/synthesis.md) combines explicit Punk/native Markdown sources through a dedicated skill and bounded agent runner. Review drafts before publishing, or explicitly enable unattended apply. Recall remains opt-in with `PUNK_RECORDS_SYNTHESIS=1`; originals stay available.
+Optional [incremental synthesis](docs/synthesis.md) combines selected Punk Records memories and native Markdown files into reviewed summaries. An agent you choose generates the drafts; its provider may receive the selected content and charge for model usage. Review and publish in the **Synthesis** tab of `punk-records serve`. Summary recall is opt-in; originals stay available.
 
 ```mermaid
 flowchart LR
@@ -31,6 +31,7 @@ flowchart LR
 | **recall** | memories injected automatically when a prompt matches |
 | **memory** | a saved fix, decision or failed attempt |
 | **draft** | an activity record that may be saved when a supported hook observes successful file edits |
+| **synthesis** | a derived summary of an explicitly selected source group, published after review by default |
 | **episodes** | your past Claude Code, Codex and OpenCode sessions, browsable with `punk-records episodes` |
 | **project** | how the episodes page groups sessions |
 | **resume command** | returns to a past session where you left off |
@@ -127,7 +128,7 @@ and are not automatically recovered or merged.
 punk-records init                   # optional, in a repo: commit agent config for your team
 punk-records ask "<symptoms, errors or file names>"
 punk-records save --type solved --title "…" --symptoms "…" --solution "…" --files src/a.ts
-punk-records serve --open           # web UI: memories + episodes (= graph --serve)
+punk-records serve --open           # web UI: memories + episodes + synthesis (= graph --serve)
 punk-records --help
 ```
 
@@ -139,6 +140,37 @@ exploring and to save what generalizes. Memory types: `solved`,
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/memories-dark.png">
   <img alt="The memory viewer: memories as a graph linked by shared tags and files, with the selected memory on the right" src="docs/images/memories-light.png">
 </picture>
+
+## Reviewed synthesis (opt-in)
+
+Use the `punk-records-synthesize` skill to select small source groups and generate
+draft summaries. Sources can combine Punk Records memories with explicitly chosen
+Claude or Codex memory Markdown files. New files and memories do not join groups
+automatically.
+
+For configured groups in the current project:
+
+```sh
+punk-records-synthesize --local -- /absolute/path/agent-adapter
+punk-records serve --scope local --open
+```
+
+In **Synthesis**, select a saved run, compare each draft with its captured sources,
+then confirm **Publish N summaries** to publish the entire request. The viewer
+also shows group freshness, run status and errors. It does not launch the agent
+or configure a schedule.
+
+Enable published summaries in recall by launching your agent with
+`PUNK_RECORDS_SYNTHESIS=1`, or try them from the CLI:
+
+```sh
+PUNK_RECORDS_SYNTHESIS=1 punk-records ask "<topic>"
+```
+
+Unchanged groups need no model call. Changed groups are regenerated from their
+full current sources, and stale summaries are excluded from recall. See the
+[synthesis guide](docs/synthesis.md) for source registration, the adapter contract,
+cost limits and a [review-first scheduling workflow](docs/synthesis.md#periodic-drafts).
 
 ## Memory protection (opt-in)
 

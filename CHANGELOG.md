@@ -19,3 +19,9 @@ paths; the `previously` command and existing memory stores remain compatible.
 - `punk-records episodes`: index of past Claude Code and Codex sessions with
   resume commands, plus a local web page and skill.
 - Plugins for Claude Code and Codex; `punk-records init` for every agent.
+- Optional incremental synthesis of explicitly selected memories and native
+  Markdown sources, with a dedicated skill and bounded agent runner. Drafts
+  require review by default; published summary recall is opt-in.
+- **Synthesis** in `punk-records serve`: inspect source groups and saved runs,
+  compare drafts with captured evidence, and publish an entire request with
+  freshness checks. Publication receipts support external review-first jobs.

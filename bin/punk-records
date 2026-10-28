@@ -165,7 +165,7 @@ usage: punk-records <command> [flags]
        [--attempt a]... [--files f]... [--tags a,b] [--ref slug] [--global|--local]
                      save a memory (or update one with --ref)
   serve [--open] [--port n] [--scope ...]
-                     web UI: memories (/) and episodes (/episodes); same flags as graph
+                     web UI: memories (/), episodes (/episodes), synthesis (/synthesis); same flags as graph
   graph [--serve] [--open] [--port n] [--scope local|global|all] [--all-projects] [--no-drafts] [--out file]
                      browse memories in a local web viewer
   build              regenerate the derived Markdown index

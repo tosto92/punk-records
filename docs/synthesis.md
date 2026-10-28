@@ -1,6 +1,10 @@
-# Incremental synthesis pilot
+# Incremental synthesis
 
-Synthesis adds reviewed summaries to recall while keeping all original Punk memories and explicitly registered native Markdown files. It makes no model calls and changes no native agent configuration. It is off by default; enable recall with `PUNK_RECORDS_SYNTHESIS=1` for `ask`, MCP and hooks.
+Synthesis adds reviewed summaries to recall while keeping all original Punk memories and explicitly registered native Markdown files. Preparation, validation, publication and recall make no model calls. Generating a summary uses your chosen agent, either in the current session or through the bounded runner; that agent may send the selected sources to a provider and incur model costs. Native agent memory configuration is unchanged. Summary recall is off by default; enable it with `PUNK_RECORDS_SYNTHESIS=1` in the environment of `ask`, the MCP server and agents running hooks.
+
+The workflow is **select sources → generate a draft → review → publish → recall**. Publication and recall enablement are separate: a published summary can be inspected even when summary recall is disabled. Use the [bounded runner](#bounded-agent-jobs) to save runs for [browser review](#review-in-the-local-viewer), then add [periodic drafts](#periodic-drafts) once the manual flow works.
+
+## Register sources and publish manually
 
 Register one group and export its current sources:
 
@@ -62,7 +66,7 @@ punk-records-synthesize --global -- claude -p --output-format text --tools "" --
 
 The example disables Claude tools and configured MCP servers and avoids persistent session files. The runner itself is not a sandbox: a supplied executable retains the operating-system access of the user running it. Choose an appropriately restricted agent command. Punk autosave is disabled in the child environment to avoid recording synthesis work as independent source evidence.
 
-Without `--apply`, a successful run returns `review_required`, leaving published summaries unchanged. Review the private response artifact and then publish:
+Without `--apply`, a successful run returns `review_required`, leaving published summaries unchanged. Review and publish the saved run in the [local viewer](#review-in-the-local-viewer), or review the private response artifact and publish from the CLI:
 
 ```sh
 punk-records synth apply --global --input /absolute/path/from-report/response.json
@@ -78,11 +82,22 @@ Artifacts are private files under the selected store's `synthesis-runs/<run-id>/
 
 ## Review in the local viewer
 
-Run `punk-records serve --open`, then choose **Synthesis** alongside Memories and Episodes. Its scope follows `serve --scope local|global|all` or `--all-projects`; projects come only from the existing registry. Configured groups and their explicit sources are listed before any run. Select a saved run to compare the draft with captured source text and the previous summary supplied to that run. This is captured evidence, not a live preview of edited files. Native Markdown and Punk Records sources retain their provenance.
+Run `punk-records serve --open`, then choose **Synthesis** alongside Memories and Episodes. Use the printed `http://127.0.0.1:PORT` address; the synthesis API checks the bound host. Its scope follows `serve --scope local|global|all` or `--all-projects`; projects come only from the existing registry. Configured groups and their explicit sources are listed before any run. Select a saved runner job to compare the draft with captured source text and the previous summary supplied to that run. Files exported by manual `synth prepare` are not saved runner jobs; use CLI publication for that workflow. This is captured evidence, not a live preview of edited files. Native Markdown and Punk Records sources retain their provenance.
 
-**Publish entire request** publishes all groups in that saved request through the same validation and atomic apply used by the CLI. It requires explicit confirmation. Changed sources, a replaced pending request, a replaced reviewed draft, missing or blocked evidence, and already consumed requests refuse publication. Refresh and prepare/run again as appropriate. Original memories and native files are never rewritten. The page does not launch an agent, edit groups, or configure scheduling.
+**Publish N summaries** publishes all groups in that saved request through the same validation and atomic apply used by the CLI. It requires explicit confirmation. Changed sources, a replaced pending request, a replaced reviewed draft, missing or blocked evidence, and already consumed requests refuse publication. Refresh and prepare/run again as appropriate. Original memories and native files are never rewritten. The page does not launch an agent, edit groups, or configure scheduling. The fallback `--viewer svg` serves only the memory graph.
 
 The viewer shows recorded input/output bytes, elapsed milliseconds and runner errors. These are operational measurements, not measured tokens or semantic coverage. Invalid JSON, invalid UTF-8 and wrong-schema output are withheld while the admitted request and report can still be inspected. No-op runs show their report without enabling publication. Active previous-summary comparisons must match the canonical preparation hash (or the reusable current card for legacy requests). Historical previous-summary comparisons are withheld with an explanation because publication or replacement consumes their independent preparation binding; equality with a current summary does not prove what was supplied at capture. Artifact files remain trusted-store evidence, not signed records. Historical evidence is screened with the current security settings and decisions; evidence whose source registration has been removed is withheld. Each artifact and the captured source evidence are bounded to 8 MiB; the newest 100 runs are shown, with directory enumeration limited to 1000 entries. Symlinks and paths supplied by the browser are refused.
+
+The publication API is restricted to the bound loopback host and same origin, with a per-server CSRF token, POST-only bounded JSON, and scoped run identifiers. Artifact content is displayed as text. This local interface assumes the operating-system user and configured stores are trusted; it is not a multi-user service.
+
+## Periodic drafts
+
+Scheduling is external to Punk Records: use your operating system's scheduler to invoke the bounded runner. A weekly draft is a useful starting cadence after a successful manual run. Keep publication manual by omitting `--apply`, and keep at most one draft request awaiting review per store:
+
+1. Run from the intended project directory for `--local`, or select `--global`. Configure the same store, security environment and agent authentication used by the manual run. Set model and budget limits in the adapter; the runner's timeout is not a token or spending cap.
+2. Save the report for a `review_required` run and the `requestId` from its response. Before launching another job, check whether that exact request was published with the command below. If it was not, leave it available for review instead of preparing a replacement.
+3. Once publication is confirmed, clear the scheduler's pending marker and invoke the runner again. `noop` means unchanged sources and no agent launch; `review_required` means a new draft to review. Preserve an `error` report for inspection rather than treating it as publication or automatically retrying.
+4. Review drafts in **Synthesis** and confirm publication. If the sources changed before publication, explicitly regenerate the stale request and update the scheduler's pending marker to the replacement.
 
 Publication records the request ID in the same atomic state update as the summaries. A scheduler can check completion independently of later source edits, new prepares, new publications, or group removal:
 
@@ -92,4 +107,4 @@ punk-records synth status --local --request-id REQUEST_UUID
 
 The additional `published` boolean means that exact request was published. The latest 100 publication receipts are retained; older requests and publications predating receipts return false. This conservative limit avoids growing state indefinitely. Group status still describes current freshness and must not be used as a request publication receipt.
 
-The publication API is restricted to the bound loopback host and same origin, with a per-server CSRF token, POST-only bounded JSON, and scoped run identifiers. Artifact content is displayed as text. This local interface assumes the operating-system user and configured stores are trusted; it is not a multi-user service.
+Punk Records does not install a timer or keep the device running. Execution while logged out, asleep or with WSL stopped depends on your scheduler configuration. Review artifacts and publication receipts also have different lifetimes: deleting an old run directory is not a request to remove its published summary.
