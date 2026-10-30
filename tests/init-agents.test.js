@@ -562,6 +562,26 @@ for (const dryRun of [true, false]) test(`observed global synthesis wrapper prun
   }
 });
 
+for (const sharedPath of ['same path', 'symlink']) test(`Claude local init preserves global coverage through a ${sharedPath}`, t => {
+  const {repo, home, read} = sandbox(t), local = path.join(repo, '.claude', 'settings.json');
+  if (sharedPath === 'same path') process.env.CLAUDE_CONFIG_DIR = path.dirname(local);
+  const global = sharedPath === 'same path' ? local : path.join(home, '.claude', 'settings.json');
+  writeJson(global, claudeConfig());
+  if (sharedPath === 'symlink') {
+    fs.mkdirSync(path.dirname(local), {recursive: true});
+    fs.symlinkSync(global, local);
+  }
+  const before = fs.readFileSync(global, 'utf8');
+  t.mock.method(console, 'error', () => {});
+  for (const dryRun of sharedPath === 'same path' ? [true, false, true, false] : [false, true, false, true]) {
+    const {touched} = initRepo({cwd: repo, explicit: 'local', agents: ['claude'], dryRun});
+    assert.equal(fs.readFileSync(global, 'utf8'), before, 'local init must preserve the shared global file');
+    assert.equal(touched.includes('.claude/settings.json'), false, 'shared global callbacks are not redundant local copies');
+    for (const event of CLAUDE_EVENTS) assert.deepEqual(commandsOf(read(global), event), [hookCommand('claude', event)]);
+    if (sharedPath === 'symlink') assert.equal(fs.readlinkSync(local), global);
+  }
+});
+
 for (const prefix of ['previously', 'punk-records', 'env PUNK_RECORDS_SYNTHESIS=1 previously', 'env PUNK_RECORDS_SYNTHESIS=1 punk-records']) {
   test(`Claude local coverage is per event and preserves global ${prefix}`, t => {
     const {root, repo, read} = sandbox(t);
