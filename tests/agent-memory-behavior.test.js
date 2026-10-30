@@ -117,7 +117,7 @@ else console.log(JSON.stringify({argv:a,cwd:process.cwd()}));\n`, {mode: 0o755})
   assert.throws(() => cliPreflight({...config, version: 'wrong'}, fixture), /version mismatch/);
   const argv = invocation(fixture, config.model, 'A synthetic prompt', 'fixture-session');
   const run = await runProcess(binary, argv, {cwd: base, env: {}});
-  assert.deepEqual(JSON.parse(run.stdout), {argv, cwd: base});
+  assert.deepEqual(JSON.parse(run.stdout), {argv, cwd: fs.realpathSync(base)});
   fs.writeFileSync(binary, fs.readFileSync(binary, 'utf8').replace('--strict-mcp-config', '--unsupported-mcp'));
   assert.throws(() => cliPreflight(config, fixture), /unsupported required flag --strict-mcp-config/);
 });
