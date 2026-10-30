@@ -265,10 +265,14 @@ The `previously` CLI and skill aliases, `.previously` project marker,
 `PREVIOUSLY_*` environment variables, and existing storage paths remain valid.
 `init` migrates its own legacy MCP IDs in place; existing memories need no
 migration. New configuration uses `punk-records` IDs and `PUNK_RECORDS_*` variables.
-Hook commands keep the `previously` alias so Claude deduplicates global and repo
-hooks during upgrades. The OpenCode loader filename and NOVA rule identifiers
-also retain their legacy names to avoid duplicate plugin loading and invalidating
-existing review decisions.
+Hook commands retain the `previously` alias for compatibility. Claude local
+`init` skips events covered globally and removes safe redundant local handlers
+on re-init; after adding global hooks, re-run local `init` in existing projects.
+Customized or ambiguous hooks are preserved with warnings. This does not
+guarantee runtime deduplication across settings, plugins or skills; see the
+[compatibility notes](docs/claude-codex-compatibility.md). The OpenCode loader
+filename and NOVA rule identifiers retain their legacy names to avoid duplicate
+plugin loading and invalidating existing review decisions.
 
 To upgrade an npm installation once the new package is published, run
 `npm uninstall -g previously-on-localhost`, then `npm install -g punk-records`
