@@ -161,3 +161,30 @@ test('derived cards label and bound escaped source provenance', t => {
   assert.ok(hint.endsWith('…')); assert.ok(block.endsWith('\n</punk-records>'));
   assert.doesNotMatch(hint, /&(?!amp;|lt;|gt;)/);
 });
+
+
+test('operational commit acknowledgements stay empty while commit failures remain searchable', t => {
+  const cwd = repo(t);
+  saveMemory({type: 'solved', title: 'procedi con commit proceed with the commit go ahead', solution: 'ACK_DISTRACTOR'}, {cwd});
+  saveMemory({type: 'solved', title: 'commit fallisce con errore hook', solution: 'Fix the failing hook'}, {cwd});
+  for (const prompt of ['procedi con commit', 'PROCEDI CON IL COMMIT!!!', 'proceed with commit', 'continue with the commit', 'go ahead with commit']) {
+    assert.equal(recallBlock(prompt, cwd), '', prompt);
+  }
+  assert.match(recallBlock('commit fallisce con errore hook', cwd), /Fix the failing hook/);
+});
+
+test('automatic wrapper keeps relevant project cards and omits conversational distractors', t => {
+  const cwd = repo(t);
+  for (const [title, solution] of [
+    ['Modbus Redis', 'la connessione per il gateway'],
+    ['M365 Bitdefender', 'con accesso verificato'],
+    ['OPNsense', 'perché la rete cade'],
+    ['Codex hooks', 'Codex hooks configuration'],
+  ]) saveMemory({type: 'solved', title, solution}, {cwd});
+  const block = recallBlock("verifichiamo anche com'è la situazione per codex", cwd);
+  assert.match(block, /Codex hooks/);
+  assert.doesNotMatch(block, /Modbus|Redis|M365|Bitdefender|OPNsense/);
+  assert.equal(recallBlock('perchè recall poco pertinente?', cwd), '');
+  assert.equal(recallBlock('procedi con commit', cwd), '');
+  assert.match(recallBlock('Come funziona Modbus con Redis?', cwd), /Modbus Redis/);
+});

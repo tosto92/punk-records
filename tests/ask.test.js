@@ -12,6 +12,7 @@ import {globalDir} from '../lib/paths.js';
 import {saveMemory} from '../lib/save.js';
 import {securityFixture, writeSecurityStore, attack, benign, benignId, attackId} from './helpers/security.js';
 import {spawnSync} from 'node:child_process';
+import {prepareSynthesis, applySynthesis} from '../lib/synthesis.js';
 
 function writeScope(dir, memories) {
   fs.mkdirSync(dir, {recursive: true});
@@ -290,4 +291,125 @@ test('full bodies come from the admitted candidate even if event storage changes
   assert.equal(hit.memory.memoryId, benignId);
   assert.equal(hit.memory.solution, solution);
   assert.match(fs.readFileSync(events, 'utf8'), /replacement after scan/);
+});
+
+
+test('automatic recall ignores conversational words without losing technical or accented queries', t => {
+  const {resolved} = fixture(t, [
+    {title: 'Modbus Redis', symptoms: 'la connessione per il gateway'},
+    {title: 'M365 Bitdefender', solution: 'con accesso verificato'},
+    {title: 'OPNsense', symptoms: 'perché la rete cade'},
+    {title: 'Codex hooks', solution: 'Verify the Codex hooks configuration'},
+    {title: 'Autenticazione modalità', solution: 'Usare modalità sicura'},
+  ]);
+  for (const [query, expected] of [
+    ["verifichiamo anche com'è la situazione per codex", ['Codex hooks']],
+    ['perchè recall poco pertinente?', []],
+    ['la per con perché anche the and please', []],
+    ['Come funziona Modbus con Redis?', ['Modbus Redis']],
+    ['Codex', ['Codex hooks']],
+    ['modalita\u0300', ['Autenticazione modalità']],
+  ]) assert.deepEqual(search({query, resolved, automatic: true}).map(h => h.title), expected, query);
+});
+
+test('automatic admission filters every candidate before top-k, including rejected leaders', t => {
+  const {home, resolved} = fixture(t, [
+    {title: 'Codex hooks', solution: 'Configure Codex hooks'},
+    {title: 'Redis deployment', solution: 'Unrelated advice', outcome: 'ok'},
+    {title: 'File index', files: Array.from({length: 30}, (_, i) => `redis/path${i}.js`)},
+  ]);
+  assert.deepEqual(search({query: 'Codex hooks redis absentword', resolved, automatic: true, limit: 3}).map(h => h.title), ['Codex hooks']);
+  writeScope(home, [
+    {title: 'Codex hooks', solution: 'Configure Codex hooks'},
+    {title: 'File index', files: Array.from({length: 30}, (_, i) => `codex/path${i}.js`)},
+  ]);
+  assert.deepEqual(search({query: 'Codex hooks', resolved, automatic: true, limit: 1}).map(h => h.title), ['Codex hooks']);
+});
+
+test('automatic rarity prefers the discriminating topic while explicit search keeps legacy scores and expansion', t => {
+  const {resolved} = fixture(t, [
+    {title: 'Codex incident'},
+    ...Array.from({length: 8}, (_, i) => ({title: `Incident ${i}`, solution: 'incident', tags: ['incident'],
+      files: Array.from({length: 30}, (_, j) => `incident/${j}.js`)})),
+  ]);
+  assert.equal(search({query: 'codex incident', resolved, automatic: true, limit: 1})[0].title, 'Codex incident');
+  const explicit = search({query: 'codex incident', resolved, limit: 20});
+  assert.equal(explicit[0].score, 66);
+  assert.match(explicit[0].title, /^Incident /);
+  assert.deepEqual(search({query: 'codex incident', resolved, limit: 20, full: true}).map(({memory, ...hit}) => hit), explicit);
+});
+
+test('automatic coverage retains unseen words and exact technical or file identifiers', t => {
+  const {resolved} = fixture(t, [
+    {title: 'Worker recovery', solution: 'deploy safely'},
+    {title: 'Recall implementation', files: ['lib/recall.js']},
+    {title: 'Codex setup'},
+  ]);
+  assert.deepEqual(search({query: 'codex unknownalpha unknownbeta unknowngamma', resolved, automatic: true}), []);
+  assert.deepEqual(search({query: 'deploy', resolved, automatic: true}).map(h => h.title), ['Worker recovery']);
+  assert.deepEqual(search({query: 'lib/recall.js', resolved, automatic: true}).map(h => h.title), ['Recall implementation']);
+});
+
+test('automatic per-field presence bounds repeated files and words', t => {
+  const {home, resolved} = fixture(t, [
+    {title: 'File reference', files: ['redis/a.js']},
+    {title: 'Redis title'},
+  ]);
+  const before = search({query: 'redis', resolved, automatic: true});
+  writeScope(home, [
+    {title: 'File reference', files: Array.from({length: 100}, (_, i) => `redis/${i}.js`)},
+    {title: 'Redis title'},
+  ]);
+  const after = search({query: 'redis', resolved, automatic: true});
+  assert.deepEqual(after.map(h => [h.title, h.score]), before.map(h => [h.title, h.score]));
+  assert.equal(after[0].title, 'Redis title');
+});
+
+test('automatic success breaks only equal relevance before timestamp and slug', t => {
+  const {resolved} = fixture(t, [
+    {title: 'File reference', files: ['redis.js'], outcome: 'ok', ts: '2026-10-09T00:00:00Z'},
+    {title: 'Redis title', outcome: 'open'},
+    {title: 'Redis equal', outcome: 'ok', ts: '2026-10-01T00:00:00Z'},
+    {title: 'Redis zero', outcome: 'ok', ts: '2026-10-01T00:00:00Z'},
+  ]);
+  assert.deepEqual(search({query: 'redis', resolved, automatic: true}).map(h => h.title),
+    ['Redis equal', 'Redis zero', 'Redis title', 'File reference']);
+});
+
+test('automatic rarity excludes blocked and draft candidates before counting corpus frequency', t => {
+  const f = securityFixture(t);
+  const safe = [
+    {...benign, title: 'Codex', solution: '', symptoms: '', tags: [], files: []},
+    {...benign, memoryId: 'c'.repeat(40), title: 'Other note', solution: '', symptoms: 'hooks', tags: [], files: []},
+  ];
+  writeSecurityStore(f.home, safe);
+  t.mock.method(console, 'error', () => {});
+  const before = search({query: 'codex hooks', resolved: f.resolved, automatic: true});
+  writeSecurityStore(f.home, [...safe,
+    ...Array.from({length: 8}, (_, i) => ({...attack, memoryId: i.toString(16).repeat(40), title: 'Codex rejected ' + i})),
+    {title: 'Worked on codex', memoryId: 'd'.repeat(40), type: 'note', tags: ['auto'], solution: '', symptoms: 'codex'},
+  ]);
+  assert.deepEqual(search({query: 'codex hooks', resolved: f.resolved, automatic: true}), before);
+  assert.deepEqual(before.map(h => h.title), ['Codex']);
+});
+
+
+test('automatic rarity omits native sources and stale derived cards but admits current summaries', t => {
+  const f = securityFixture(t);
+  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1', PREVIOUSLY_SYNTHESIS: '1'});
+  writeSecurityStore(f.home, [
+    {...benign, title: 'Codex', solution: '', symptoms: '', tags: [], files: []},
+    {...benign, memoryId: 'c'.repeat(40), title: 'Other note', solution: '', symptoms: 'hooks', tags: [], files: []},
+  ]);
+  const before = search({query: 'codex hooks', resolved: f.resolved, automatic: true});
+  const file = path.join(f.root, 'native.md'); fs.writeFileSync(file, 'codex');
+  const options = {store: f.home, scope: 'global'};
+  const prepared = prepareSynthesis({...options, group: 'reference', files: [file]});
+  assert.deepEqual(search({query: 'codex hooks', resolved: f.resolved, automatic: true}), before);
+  assert.ok(search({query: 'codex', resolved: f.resolved}).some(h => h.native));
+  applySynthesis({...options, response: {requestId: prepared.requestId, summaries: prepared.groups.map(g => ({
+    group: g.group, title: 'Codex hooks summary', summary: 'Configure Codex hooks', sourceIds: g.sources.map(s => s.id)}))}});
+  assert.ok(search({query: 'codex hooks', resolved: f.resolved, automatic: true}).some(h => h.derived));
+  fs.writeFileSync(file, 'codex changed');
+  assert.deepEqual(search({query: 'codex hooks', resolved: f.resolved, automatic: true}), before);
 });
