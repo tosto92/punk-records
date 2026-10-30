@@ -58,10 +58,10 @@ test('linked, detached and moved checkouts share primary memory and identity, ke
 
 test('saves and updates by ref are visible from primary and sibling without local stores', t => {
   const {repo, internal, external, store} = fixture(t);
-  const saved = saveMemory({type: 'solved', title: 'shared worktree fix', solution: 'restart'}, {cwd: internal});
-  for (const cwd of [repo, external]) {
+  const saved = saveMemory({type: 'solved', title: 'shared worktree fix', solution: 'restart', ts: '2026-01-01T00:00:00.000Z'}, {cwd: internal});
+  for (const [cwd, ts] of [[repo, '2026-01-01T00:00:01.000Z'], [external, '2026-01-01T00:00:02.000Z']]) {
     assert.equal(search({query: 'shared worktree fix', scope: 'local', resolved: {repoRoot: cwd}})[0]?.memoryId, saved.memoryId);
-    const updated = saveMemory({ref: saved.memoryId, solution: 'restart safely'}, {cwd});
+    const updated = saveMemory({ref: saved.memoryId, solution: 'restart safely', ts}, {cwd});
     assert.equal(updated.memoryId, saved.memoryId);
   }
   assert.equal(loadMemories(store).memories[0].solution, 'restart safely');
