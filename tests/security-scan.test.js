@@ -84,12 +84,18 @@ test('original Unicode code points are counted once; oversized entries do not po
   assert.equal(report.results[1].reasonCodes[0], 'memory_too_large');
 });
 
-test('request overflow includes rules and excludes the whole batch', t => {
+test('large requests are scanned in bounded batches with ordered identities', t => {
   const store = temp(t);
   const entries = Array.from({length: 50}, (_, i) => entry(store, {
     memoryId: i.toString(16).padStart(40, '0'), solution: '😀'.repeat(25000)}));
-  failed(scanMemories(entries), 'batch_too_large', entries.length);
-  const rulesDir = temp(t);
+  const report = fixture('valid-response.py', () => scanMemories(entries));
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.results.map(r => r.memoryId), entries.map(e => e.memory.memoryId));
+  assert.ok(report.results.every(r => r.status === 'no_signals'));
+});
+
+test('oversized rules cannot bypass the request limit', t => {
+  const store = temp(t), rulesDir = temp(t);
   fs.writeFileSync(path.join(rulesDir, 'huge.nov'), '#' + 'x'.repeat(4 * 1024 * 1024));
   failed(scanMemories([entry(store)], {rulesDir}), 'batch_too_large', 1);
 });
@@ -237,4 +243,19 @@ test('absent stores still validate engine/rules and compilation issues use exist
   } finally { console.error = original; }
   assert.equal(messages.length, 1);
   assert.match(messages[0], /events.jsonl line 1: malformed JSONL/);
+});
+
+
+test('scanner batches share one timeout budget', t => {
+  const store = temp(t), interpreter = path.join(store, 'slow-scanner');
+  fs.writeFileSync(interpreter, `#!/usr/bin/env python3
+import time, runpy
+time.sleep(3)
+runpy.run_path(${JSON.stringify(path.join(root, 'tests/fixtures/security/valid-response.py'))}, run_name='__main__')
+`, {mode: 0o755});
+  const entries = Array.from({length: 50}, (_, i) => entry(store, {
+    memoryId: i.toString(16).padStart(40, '0'), solution: '😀'.repeat(25000)}));
+  const start = performance.now();
+  failed(configured(interpreter, () => scanMemories(entries)), 'scan_timeout', 50);
+  assert.ok(performance.now() - start < 6500, 'a second batch must not receive a fresh five-second budget');
 });

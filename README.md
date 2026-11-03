@@ -113,6 +113,13 @@ through saving one memory. Legacy `previously` skill and command names still wor
 
 Automatic recall conservatively matches topical words, ignores common Italian/English filler, and stays empty when evidence is weak or the prompt is only an operational confirmation. It omits activity drafts and raw native Markdown sources. For broader retrieval, use an explicit `punk-records ask "<query>"` or `memory_find` search; their matching and scores are unchanged. A draft is only an activity summary of recorded edits, not a learned solution. It is not guaranteed for every session: it needs autosave enabled and supported, successfully observed file edits. Investigation-only sessions do not create a meaningful memory automatically; the agent must choose to save a useful finding. After you promote a draft, later automatic captures from that session leave the memory unchanged.
 
+Interrupted `Stop` batches are retained rather than expired. A later `Stop` for
+that session can recover a batch from a stopped process when its recorded checkout
+matches and the session memory is still compatible. Already-saved draft content
+is not appended again. Legacy batches without checkout metadata, malformed batches,
+and batches conflicting with a newer or promoted memory stay in `spool/` with a
+warning for manual reconciliation; they are not blindly replayed or deleted.
+
 For complete details, use `punk-records ask "<query>" --full` (JSON array; add `--limit 1` to retrieve one result) or `memory_find({ query, full: true, limit: 1 })`. Full retrieval is explicit; MCP requires `full` to be a boolean. Ordinary CLI and MCP search defaults are unchanged.
 
 Git linked worktrees share the primary checkout's `memory/` and repository identity,
@@ -131,6 +138,10 @@ punk-records save --type solved --title "…" --symptoms "…" --solution "…" 
 punk-records serve --open           # web UI: memories + episodes + synthesis (= graph --serve)
 punk-records --help
 ```
+
+The web viewer binds to `127.0.0.1` and checks the request host and origin on
+all routes, including memory and episode reads. Use the exact URL it prints;
+other hostnames and cross-site requests are rejected.
 
 Agents mostly do this themselves: the skill tells them to recall before
 exploring and to save what generalizes. Memory types: `solved`,

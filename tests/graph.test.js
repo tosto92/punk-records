@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createServer } from 'node:net';
+import {request} from 'node:http';
 
 import { edgesOf, graphHtml, writeGraph, contextGraph, collectMemories } from "../lib/graph.js";
 import { repoDir, resolveScopes } from "../lib/paths.js";
@@ -204,4 +205,26 @@ test('serveGraph rejects listen errors without an unhandled rejection', async ()
   `;
   const res = spawnSync(process.execPath, ['--input-type=module', '-e', script], {encoding: 'utf8', timeout: 4000});
   assert.equal(res.status, 0, res.stderr);
+});
+
+
+test('every viewer route rejects foreign hosts and origins before reading private data', async t => {
+  const repo = tempRepo('mem-viewer-origin-');
+  t.after(() => fs.rmSync(path.dirname(repo), {recursive: true, force: true}));
+  const {serveGraph} = await import('../lib/graph.js');
+  for (const viewer of ['auto', 'svg']) {
+    const server = await serveGraph(resolveScopes({explicit: 'local'}, repo), {scope: 'local', port: 0, viewer});
+    try {
+      for (const route of ['/', '/index.html', '/api/context-graph', '/api/data', '/api/session?id=private', '/api/synthesis']) {
+        for (const headers of [{host: 'attacker.invalid'}, {origin: 'http://attacker.invalid'}, {'sec-fetch-site': 'cross-site'}]) {
+          const status = await new Promise((resolve, reject) => {
+            const req = request(server.url + route, {headers}, res => {res.resume(); res.on('end', () => resolve(res.statusCode));});
+            req.on('error', reject); req.end();
+          });
+          assert.equal(status, 403, `${viewer} ${route} ${JSON.stringify(headers)}`);
+        }
+      }
+      assert.equal((await fetch(server.url, {headers: {origin: server.url}})).status, 200);
+    } finally { await server.close(); }
+  }
 });

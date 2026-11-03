@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {execFileSync, spawnSync} from 'node:child_process';
+import {execFileSync, spawnSync, spawn} from 'node:child_process';
 import {handleHook, spoolPath, RECALL_OUTPUT} from '../lib/hook.js';
 import {WORKFLOW_GUIDANCE} from '../lib/workflow.js';
 import {saveMemory} from '../lib/save.js';
@@ -258,4 +258,118 @@ test('SessionStart rejects unsupported source and invalid session', async t => {
   for (const input of [ev(cwd, {source: 'unexpected'}), {source: 'startup', session_id: '../bad'}]) {
     assert.equal(await handleHook('claude', 'SessionStart', input), null);
   }
+});
+
+
+async function interruptedStop(t, cwd, committed = false) {
+  const script = `import {handleHook} from ${JSON.stringify(new URL('../lib/hook.js', import.meta.url).href)};
+    import {saveMemory} from ${JSON.stringify(new URL('../lib/save.js', import.meta.url).href)};
+    await handleHook('claude', 'Stop', ${JSON.stringify(ev(cwd))}, {save: (...args) => {
+      ${committed ? 'saveMemory(...args);' : ''}
+      process.stdout.write('claimed'); return new Promise(() => setInterval(() => {}, 1000));
+    }});`;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], {env: process.env, stdio: ['ignore', 'pipe', 'pipe']});
+  t.after(() => child.kill('SIGKILL'));
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {child.kill('SIGKILL'); reject(new Error('Stop did not claim batch'));}, 10000);
+    child.once('error', error => {clearTimeout(timer); reject(error);});
+    child.once('exit', () => {clearTimeout(timer); reject(new Error('Stop exited before barrier'));});
+    child.stdout.once('data', () => {clearTimeout(timer); resolve();});
+  });
+  await new Promise(resolve => {child.once('close', resolve); child.kill('SIGKILL');});
+  return `${spoolPath('claude', 'sess-1')}.flushing.${child.pid}`;
+}
+
+for (const committed of [false, true]) test(`Stop reconciles a killed process ${committed ? 'after' : 'before'} commit without duplicate events`, async t => {
+  const {cwd, memories} = fixture(t);
+  await handleHook('claude', 'PostToolUse', write(cwd, 'recovered.js'));
+  const orphan = await interruptedStop(t, cwd, committed);
+  assert.ok(fs.existsSync(orphan));
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.deepEqual(memories().map(m => m.files), [['recovered.js']]);
+  assert.equal(fs.existsSync(orphan), false);
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.equal(fs.readFileSync(path.join(cwd, 'memory', 'events.jsonl'), 'utf8').trim().split('\n').length, 1);
+});
+
+test('Stop preserves ambiguous old orphans instead of aging them out', async t => {
+  const {cwd} = fixture(t);
+  const spool = spoolPath('claude', 'sess-1'), orphan = `${spool}.flushing.2147483647`;
+  fs.mkdirSync(path.dirname(spool), {recursive: true});
+  const content = JSON.stringify({t: 'edit', file: 'legacy.js'}) + '\n';
+  fs.writeFileSync(orphan, content);
+  const past = new Date(Date.now() - 8 * 86400000); fs.utimesSync(orphan, past, past);
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.equal(fs.readFileSync(orphan, 'utf8'), content);
+});
+
+test('orphan recovery does not overwrite a newer prompt or consume a different project batch', async t => {
+  const {root, cwd, memories} = fixture(t);
+  await handleHook('claude', 'UserPromptSubmit', ev(cwd, {prompt: 'old context'}));
+  await handleHook('claude', 'PostToolUse', write(cwd, 'old.js'));
+  const orphan = await interruptedStop(t, cwd);
+  const other = path.join(root, 'other'); fs.mkdirSync(other); execFileSync('git', ['init', '-q'], {cwd: other});
+  await handleHook('claude', 'Stop', ev(other));
+  assert.ok(fs.existsSync(orphan));
+  assert.equal(loadMemories(path.join(other, 'memory')).memories.length, 0);
+  await handleHook('claude', 'UserPromptSubmit', ev(cwd, {prompt: 'new context'}));
+  await handleHook('claude', 'PostToolUse', write(cwd, 'new.js'));
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.equal(memories()[0].symptoms, 'new context');
+  // The old prompt conflicts with the current memory and remains available for manual reconciliation.
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.ok(fs.existsSync(orphan));
+  assert.equal(memories()[0].symptoms, 'new context');
+});
+
+
+test('recovery preserves live, malformed and promoted batches', async t => {
+  const {cwd, memories} = fixture(t);
+  await handleHook('claude', 'PostToolUse', write(cwd, 'pending.js'));
+  const spool = spoolPath('claude', 'sess-1'), live = `${spool}.flushing.${process.pid}`;
+  fs.renameSync(spool, live);
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.ok(fs.existsSync(live)); assert.equal(memories().length, 0);
+  const malformed = `${spool}.flushing.2147483647`;
+  fs.renameSync(live, malformed); fs.appendFileSync(malformed, '{incomplete');
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.ok(fs.existsSync(malformed)); assert.equal(memories().length, 0);
+  fs.rmSync(malformed);
+  await handleHook('claude', 'PostToolUse', write(cwd, 'pending.js'));
+  const orphan = await interruptedStop(t, cwd, true);
+  saveMemory({ref: memories()[0].memoryId, type: 'solved', solution: 'Reviewed solution'}, {cwd});
+  const before = fs.readFileSync(path.join(cwd, 'memory', 'events.jsonl'), 'utf8');
+  await handleHook('claude', 'Stop', ev(cwd));
+  assert.ok(fs.existsSync(orphan));
+  assert.equal(fs.readFileSync(path.join(cwd, 'memory', 'events.jsonl'), 'utf8'), before);
+});
+
+test('recovery failure retains a claimed batch for a later process', async t => {
+  const {cwd, memories} = fixture(t);
+  await handleHook('claude', 'PostToolUse', write(cwd, 'pending.js'));
+  await interruptedStop(t, cwd);
+  await handleHook('claude', 'Stop', ev(cwd), {save: () => {throw new Error('disk unavailable');}});
+  const names = fs.readdirSync(path.dirname(spoolPath('claude', 'sess-1')));
+  assert.equal(names.length, 1); assert.match(names[0], /\.flushing\./);
+  assert.match(fs.readFileSync(path.join(path.dirname(spoolPath('claude', 'sess-1')), names[0]), 'utf8'), /pending.js/);
+  assert.equal(memories().length, 0);
+});
+
+
+test('concurrent recovery extends a compatible draft once without losing prior files', async t => {
+  const {cwd, memories} = fixture(t);
+  await handleHook('claude', 'PostToolUse', write(cwd, 'first.js'));
+  await handleHook('claude', 'Stop', ev(cwd));
+  await handleHook('claude', 'PostToolUse', write(cwd, 'second.js'));
+  await interruptedStop(t, cwd);
+  let entered, release;
+  const saving = new Promise(resolve => {entered = resolve;});
+  const barrier = new Promise(resolve => {release = resolve;});
+  const first = handleHook('claude', 'Stop', ev(cwd), {save: async (...args) => {
+    entered(); await barrier; return saveMemory(...args);
+  }});
+  try { await saving; await handleHook('claude', 'Stop', ev(cwd)); }
+  finally { release(); await first; }
+  assert.deepEqual(memories().map(m => m.files), [['first.js', 'second.js']]);
+  assert.equal(fs.readFileSync(path.join(cwd, 'memory', 'events.jsonl'), 'utf8').trim().split('\n').length, 2);
 });

@@ -82,6 +82,14 @@ successfully committed save remains saved if scanning subsequently fails; inspec
 the diagnostic and use `scan` to resolve it. Saving, `outcome: ok`, and rebuilding
 derived files are not security approval.
 
+Automatic recall skips activity drafts and raw native sources before scanning,
+except when a derived summary depends on them. Those dependencies still require
+security admission. Explicit retrieval continues to scan drafts and native sources.
+Large scan requests are split into batches of at most 4 MiB, including rules,
+with one shared five-second bridge budget. Results remain bound to their original
+memory identities and content hashes. Oversized rules, timeouts and invalid bridge
+responses still fail closed; batching does not remove the scanner's runtime limit.
+
 ## Human review, exceptions, and revocation
 
 ```sh
