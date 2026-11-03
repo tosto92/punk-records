@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execFile } from "node:child_process";
 import { listProjects, registerProject } from "../lib/projects.js";
 import { saveMemory } from "../lib/save.js";
 import { initRepo } from "../lib/init.js";
 import { collectMemories, contextGraph } from "../lib/graph.js";
 import { resolveScopes } from "../lib/paths.js";
+import { loadMemories } from "../lib/build.js";
 
 const BIN = path.resolve(import.meta.dirname, "..", "bin", "previously");
 
@@ -57,7 +58,98 @@ test("registry junk lines are ignored and an unwritable registry never breaks a 
   fs.rmSync(path.join(root, "global", "projects.txt"));
   fs.mkdirSync(path.join(root, "global", "projects.txt"));
   assert.doesNotThrow(() => registerProject(a));
-  assert.doesNotThrow(() => saveMemory({ type: "note", title: "two" }, { cwd: a }));
+  const saved = saveMemory({ type: "note", title: "two" }, { cwd: a });
+  assert.equal(saved.written, 1);
+  assert.ok(loadMemories(path.join(a, "memory")).memories.some(m => m.memoryId === saved.memoryId));
+});
+
+test("registerProject does not probe unrelated roots", (t) => {
+  const { root, repo } = sandbox(t);
+  const current = repo("current");
+  const unrelated = Array.from({length: 12}, (_, i) => repo(`unrelated-${i}`));
+  const alias = path.join(root, "stale-alias");
+  fs.symlinkSync(path.join(root, "vanished"), alias);
+  const inaccessible = repo("inaccessible");
+  const registry = path.join(root, "global", "projects.txt");
+  fs.mkdirSync(path.dirname(registry));
+  fs.writeFileSync(registry, [...unrelated, alias, inaccessible].join("\n") + "\n");
+  // Observe Git launches in a child so the spy cannot affect other tests.
+  const targets = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", `
+    import cp from 'node:child_process';
+    import {syncBuiltinESMExports} from 'node:module';
+    const original = cp.execFileSync, targets = [];
+    cp.execFileSync = (command, args, options) => {
+      if (command === 'git') {
+        targets.push(options.cwd);
+        if (options.cwd === ${JSON.stringify(inaccessible)}) throw new Error('inaccessible repository');
+      }
+      return original(command, args, options);
+    };
+    syncBuiltinESMExports();
+    const {registerProject} = await import('./lib/projects.js');
+    registerProject(${JSON.stringify(current)});
+    console.log(JSON.stringify(targets));
+  `], {cwd: path.resolve(import.meta.dirname, ".."), env: process.env, encoding: "utf8"}));
+  assert.ok(targets.length > 0, "current root must still be validated");
+  assert.deepEqual([...new Set(targets)], [current]);
+  assert.ok(fs.readFileSync(registry, "utf8").endsWith(`${current}\n`));
+});
+
+test("registration compares trimmed canonical lines and appends a legacy alias only once", (t) => {
+  const { root, repo } = sandbox(t);
+  const current = repo("current"), alias = path.join(root, "alias");
+  fs.symlinkSync(current, alias);
+  const registry = path.join(root, "global", "projects.txt");
+  fs.mkdirSync(path.dirname(registry));
+  fs.writeFileSync(registry, `  ${current}  \n`);
+  registerProject(alias);
+  assert.equal(fs.readFileSync(registry, "utf8"), `  ${current}  \n`);
+  fs.mkdirSync(path.join(current, "memory"));
+  fs.writeFileSync(path.join(current, "memory", "events.jsonl"), "");
+  fs.writeFileSync(registry, `${alias}\n`);
+  registerProject(alias);
+  registerProject(current);
+  assert.equal(fs.readFileSync(registry, "utf8"), `${alias}\n${current}\n`);
+  assert.deepEqual(listProjects(), [current]);
+});
+
+test("registration refuses a registry symlink without changing its target", (t) => {
+  const { root, repo } = sandbox(t);
+  const current = repo("current"), target = path.join(root, "target");
+  fs.writeFileSync(target, "unchanged\n");
+  fs.mkdirSync(path.join(root, "global"));
+  fs.symlinkSync(target, path.join(root, "global", "projects.txt"));
+  assert.doesNotThrow(() => registerProject(current));
+  assert.equal(fs.readFileSync(target, "utf8"), "unchanged\n");
+});
+
+test("invalid current Git metadata does not change the registry", (t) => {
+  const { root } = sandbox(t);
+  const invalid = path.join(root, "invalid");
+  fs.mkdirSync(invalid);
+  fs.writeFileSync(path.join(invalid, ".git"), "gitdir: missing\n");
+  const registry = path.join(root, "global", "projects.txt");
+  fs.mkdirSync(path.dirname(registry));
+  fs.writeFileSync(registry, "unchanged\n");
+  assert.doesNotThrow(() => registerProject(invalid));
+  assert.equal(fs.readFileSync(registry, "utf8"), "unchanged\n");
+});
+
+test("concurrent registration preserves complete append lines and deduplicated listing", async (t) => {
+  const { root, repo } = sandbox(t);
+  const current = repo("current");
+  fs.mkdirSync(path.join(current, "memory"));
+  fs.writeFileSync(path.join(current, "memory", "events.jsonl"), "");
+  await Promise.all(Array.from({length: 6}, () => new Promise((resolve, reject) => {
+    execFile(process.execPath, ["--input-type=module", "-e", `
+      import {registerProject} from './lib/projects.js';
+      registerProject(${JSON.stringify(current)});
+    `], {cwd: path.resolve(import.meta.dirname, ".."), env: process.env}, error => error ? reject(error) : resolve());
+  })));
+  const lines = fs.readFileSync(path.join(root, "global", "projects.txt"), "utf8").trim().split("\n");
+  assert.ok(lines.length >= 1 && lines.length <= 6);
+  assert.ok(lines.every(line => line === current));
+  assert.deepEqual(listProjects(), [current]);
 });
 
 test("init --local registers the project", (t) => {

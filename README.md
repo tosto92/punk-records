@@ -268,7 +268,9 @@ migration. New configuration uses `punk-records` IDs and `PUNK_RECORDS_*` variab
 Hook commands retain the `previously` alias for compatibility. Claude local
 `init` skips events covered globally and removes safe redundant local handlers
 on re-init; after adding global hooks, re-run local `init` in existing projects.
-Customized or ambiguous hooks are preserved with warnings. This does not
+Generated hooks retain a 10-second timeout; re-init preserves custom budgets,
+including 30 seconds, and synthesis-enabled commands. Ambiguous hook events
+are left unchanged with warnings, without adding unconditional handlers. This does not
 guarantee runtime deduplication across settings, plugins or skills; see the
 [compatibility notes](docs/claude-codex-compatibility.md). The OpenCode loader
 filename and NOVA rule identifiers retain their legacy names to avoid duplicate

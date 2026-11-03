@@ -289,3 +289,42 @@ test('short checkout aliases preserve nearer explicit markers during scope resol
   assert.equal(loadMemories(path.join(marked, 'memory')).memories[0]?.title, 'independent aliased marker');
   assert.equal(fs.existsSync(path.join(repo, 'memory')), false);
 });
+
+
+test('empty synthesis adds no Git identity probes and preserves recall store attribution', t => {
+  const {root, repo, external, store} = fixture(t);
+  const local = saveMemory({type: 'solved', title: 'shared recall evidence', solution: 'local source'}, {cwd: repo});
+  const global = saveMemory({type: 'solved', title: 'shared recall evidence', solution: 'global source'}, {cwd: repo, scope: 'global'});
+  const trace = path.join(root, 'git-trace.jsonl');
+  const previous = process.env.GIT_TRACE2_EVENT;
+  process.env.GIT_TRACE2_EVENT = trace;
+  t.after(() => { if (previous === undefined) delete process.env.GIT_TRACE2_EVENT; else process.env.GIT_TRACE2_EVENT = previous; });
+  const query = synthesis => {
+    process.env.PUNK_RECORDS_SYNTHESIS = synthesis;
+    process.env.PREVIOUSLY_SYNTHESIS = synthesis;
+    fs.writeFileSync(trace, '');
+    const hits = search({query: 'shared recall evidence', resolved: {repoRoot: external}, full: true});
+    const probes = fs.readFileSync(trace, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)
+      .filter(event => event.event === 'start').map(event => event.argv);
+    return {hits, probes};
+  };
+  const disabled = query('0'), enabled = query('1');
+  assert.ok(disabled.probes.length > 0, 'the linked checkout must exercise real Git identity probes');
+  assert.deepEqual(enabled.hits, disabled.hits);
+  assert.deepEqual(enabled.hits.map(h => [h.scope, h.memoryId, h.memory.solution]).sort(),
+    [['global', global.memoryId, 'global source'], ['repo', local.memoryId, 'local source']]);
+  assert.ok(fs.existsSync(path.join(store, 'events.jsonl')));
+  assert.equal(fs.existsSync(path.join(external, 'memory')), false);
+  assert.equal(enabled.probes.length, disabled.probes.length, 'empty synthesis must not repeat Git identity resolution');
+});
+
+test('recall revalidates worktree identity on the next query', t => {
+  const {root, repo, external, git} = fixture(t);
+  process.env.PUNK_RECORDS_SYNTHESIS = process.env.PREVIOUSLY_SYNTHESIS = '1';
+  const saved = saveMemory({type: 'solved', title: 'identity recall evidence', solution: 'primary store'}, {cwd: repo});
+  const options = {query: 'identity recall evidence', scope: 'local', resolved: {repoRoot: external}};
+  assert.equal(search(options)[0]?.memoryId, saved.memoryId);
+  git(repo, 'config', 'core.worktree', path.join(root, 'missing-primary'));
+  assert.throws(() => search(options), /primary.*(unavailable|unusable|checkout)/i);
+  assert.equal(fs.existsSync(path.join(external, 'memory')), false);
+});
