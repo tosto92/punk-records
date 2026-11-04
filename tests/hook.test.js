@@ -10,7 +10,7 @@ import {saveMemory} from '../lib/save.js';
 import {loadMemories} from '../lib/build.js';
 import {collectMemories, contextGraph} from '../lib/graph.js';
 
-const BIN = path.resolve(import.meta.dirname, '..', 'bin', 'previously');
+const BIN = path.resolve(import.meta.dirname, '..', 'bin', 'punk-records');
 const FIXTURES = path.join(import.meta.dirname, 'fixtures', 'hooks');
 
 // Fresh repo + isolated global store (spool lives there); autosave forced on.
@@ -19,12 +19,12 @@ function fixture(t) {
   const cwd = path.join(root, 'repo');
   fs.mkdirSync(cwd);
   execFileSync('git', ['init', '-q'], {cwd});
-  const keys = ['PUNK_RECORDS_HOME', 'PREVIOUSLY_HOME', 'PUNK_RECORDS_AUTOSAVE', 'PREVIOUSLY_AUTOSAVE'];
+  const keys = ['PUNK_RECORDS_HOME', 'PUNK_RECORDS_AUTOSAVE'];
   const prev = Object.fromEntries(keys.map(k => [k, process.env[k]]));
   delete process.env.PUNK_RECORDS_HOME;
   delete process.env.PUNK_RECORDS_AUTOSAVE;
-  process.env.PREVIOUSLY_HOME = path.join(root, 'global');
-  delete process.env.PREVIOUSLY_AUTOSAVE;
+  process.env.PUNK_RECORDS_HOME = path.join(root, 'global');
+  delete process.env.PUNK_RECORDS_AUTOSAVE;
   t.after(() => {
     for (const [k, v] of Object.entries(prev)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
     fs.rmSync(root, {recursive: true, force: true});
@@ -126,10 +126,10 @@ test('Claude payloads captured from the real CLI produce a Claude Code draft', a
   assert.ok(draft.files.includes('hello.txt'), JSON.stringify(draft.files));
 });
 
-test('PREVIOUSLY_AUTOSAVE=0 keeps recall but writes no spool and no memory', async t => {
+test('PUNK_RECORDS_AUTOSAVE=0 keeps recall but writes no spool and no memory', async t => {
   const {cwd, memories} = fixture(t);
   saveMemory({type: 'solved', title: 'Zebra quartz deploy gotcha', symptoms: 'zebra quartz', solution: 'flag'}, {cwd});
-  process.env.PREVIOUSLY_AUTOSAVE = '0';
+  process.env.PUNK_RECORDS_AUTOSAVE = '0';
   const out = await handleHook('claude', 'UserPromptSubmit', ev(cwd, {prompt: 'zebra quartz deploy'}));
   assert.ok(out, 'recall still answers');
   await handleHook('claude', 'PostToolUse', write(cwd, 'a.js'));

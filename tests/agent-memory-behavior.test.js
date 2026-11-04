@@ -52,7 +52,7 @@ test('only source-attributed host context attachments prove lifecycle receipt', 
 
 test('isolation clears current/legacy aliases, config/plugin/MCP/auth overrides', () => {
   const poisoned = {PATH: '/usr/bin', HOME: '/real', PUNK_RECORDS_HOME: '/real/memory', PREVIOUSLY_HOME: '/real/old',
-    PUNK_RECORDS_PYTHON: '/evil', PREVIOUSLY_SECURITY: '0', CLAUDE_CONFIG_DIR: '/real/config',
+    PUNK_RECORDS_PYTHON: '/evil', PUNK_RECORDS_SECURITY: '0', CLAUDE_CONFIG_DIR: '/real/config',
     CLAUDE_CODE_OAUTH_TOKEN: 'secret', ANTHROPIC_API_KEY: 'secret', ANTHROPIC_BASE_URL: 'https://evil',
     CLAUDE_PLUGIN_ROOT: '/evil', MCP_CONFIG: '/evil', NODE_OPTIONS: '--require=/evil', BASH_ENV: '/evil',
     CODEX_HOME: '/real/codex', XDG_CONFIG_HOME: '/real/xdg', AWS_PROFILE: 'real', HTTPS_PROXY: 'https://evil'};
@@ -77,7 +77,7 @@ test('permissions and resume argv remain bounded and revision-pinned', () => {
     validator: '/tmp/fixture/repo/validate.cjs', mcpConfig: '/tmp/fixture/mcp.json', namespace: 'punk-records'};
   const allowed = permissions(fixture);
   assert.ok(allowed.includes('Bash(punk-records ask *)'));
-  assert.ok(allowed.includes(`Bash(node ${ROOT}/bin/previously save *)`));
+  assert.ok(allowed.includes(`Bash(node ${ROOT}/bin/punk-records save *)`));
   assert.ok(allowed.includes('mcp__punk-records__memory_find'));
   assert.ok(!allowed.includes('Bash'));
   const argv = invocation(fixture, 'claude-opus-5-5', 'hello', 'uuid', true);
@@ -122,16 +122,16 @@ else console.log(JSON.stringify({argv:a,cwd:process.cwd()}));\n`, {mode: 0o755})
   assert.throws(() => cliPreflight(config, fixture), /unsupported required flag --strict-mcp-config/);
 });
 
-test('real fixture uses the selected APIs, pins both aliases and refuses path poisoning', t => {
+test('real fixture uses the selected APIs, pins the executable and refuses path poisoning', t => {
   const fixture = createFixture({root: ROOT, installation: 'standalone-project', caseId: 'apply', attempt: 1});
   t.after(() => fs.rmSync(fixture.base, {recursive: true, force: true}));
   assert.equal(verifyFixture(fixture).resolver.global, fixture.env.PUNK_RECORDS_HOME);
-  for (const alias of ['punk-records', 'previously']) {
+  for (const alias of ['punk-records']) {
     assert.equal(fs.realpathSync(path.join(fixture.base, 'bin', alias)), fs.realpathSync(path.join(ROOT, 'bin', alias)));
   }
   const config = JSON.parse(fs.readFileSync(fixture.mcpConfig));
   assert.equal(config.mcpServers['punk-records'].args[0], path.join(ROOT, 'bin', 'punk-records'));
-  fixture.env.PREVIOUSLY_HOME = '/poison';
+  fixture.env.PUNK_RECORDS_HOME = '/poison';
   assert.throws(() => verifyFixture(fixture), /environment/);
 });
 
@@ -197,7 +197,7 @@ test('trusted PreToolUse guard denies host/auth access and symlink escapes befor
     ['Glob', {path: fixture.cwd, pattern: '../**/*'}],
     ['Grep', {path: outside, pattern: 'sentinel'}],
     ['Bash', {command: 'punk-records ask x | cat /etc/passwd'}],
-    ['Bash', {command: 'node previously save --title fake'}],
+    ['Bash', {command: 'node punk-records save --title fake'}],
     ['Bash', {command: `node ${fixture.validator}`, run_in_background: true}],
     ['Write', {file_path: fixture.validator, content: 'unsafe'}],
   ]) {
@@ -209,7 +209,7 @@ test('trusted PreToolUse guard denies host/auth access and symlink escapes befor
   }
   assert.equal(guardTool(fixture, {tool_name: 'Read', tool_input: {file_path: fixture.configFile}}).permissionDecision, 'allow');
   assert.equal(guardTool(fixture, {tool_name: 'Bash', tool_input: {command: 'punk-records ask "safe query"'}}).permissionDecision, 'allow');
-  assert.equal(guardTool(fixture, {tool_name: 'Bash', tool_input: {command: `node ${fixture.root}/bin/previously ask "safe query"`}}).permissionDecision, 'allow');
+  assert.equal(guardTool(fixture, {tool_name: 'Bash', tool_input: {command: `node ${fixture.root}/bin/punk-records ask "safe query"`}}).permissionDecision, 'allow');
   assert.equal(fs.existsSync(path.join(outside, 'host.txt')), false);
   const malformed = spawnSync(process.execPath, [fixture.guard], {cwd: fixture.cwd, env: fixture.env, input: 'invalid JSON', encoding: 'utf8'});
   assert.equal(malformed.status, 2, 'guard parser failure must block rather than continue');
@@ -244,7 +244,7 @@ test('native search guard rejects recursive protected stores and keeps scoped ta
     ['Glob', {pattern: '**/*'}],
     ['Glob', {path: source, pattern: path.join(fixture.cwd, '{memory,src}', '**/*')}],
     ['Glob', {path: source, pattern: '{../memory,./}/**/*'}],
-    ...['memory', '.claude', '.git', '.punk-records', '.previously'].flatMap(name => [
+    ...['memory', '.claude', '.git', '.punk-records'].flatMap(name => [
       ['Grep', {path: path.join(fixture.cwd, name), ...search}],
       ['Glob', {path: fixture.cwd, pattern: `${name}/**/*`}],
     ]),
@@ -329,7 +329,7 @@ test('quota failure retains actual hook/guard observations before cleanup withou
   const binary = path.join(fixture.base, 'quota-cli.cjs');
   const quota = "You've hit your weekly limit · resets Oct 26, 9am (Europe/Rome)";
   fs.writeFileSync(binary, `#!${process.execPath}\nconst {spawnSync}=require('child_process');
-const hooked=spawnSync('previously',['hook','claude','SessionStart'],{input:JSON.stringify({session_id:'quota-fixture',cwd:process.cwd(),source:'startup',hook_event_name:'SessionStart'}),encoding:'utf8'});
+const hooked=spawnSync('punk-records',['hook','claude','SessionStart'],{input:JSON.stringify({session_id:'quota-fixture',cwd:process.cwd(),source:'startup',hook_event_name:'SessionStart'}),encoding:'utf8'});
 if(hooked.status!==0)process.exit(3);
 const output=JSON.parse(hooked.stdout);
 spawnSync(${JSON.stringify(process.execPath)},[${JSON.stringify(fixture.guard)}],{input:JSON.stringify({hook_event_name:'PreToolUse',tool_name:'Read',tool_input:{file_path:${JSON.stringify(fixture.configFile)}}}),encoding:'utf8'});

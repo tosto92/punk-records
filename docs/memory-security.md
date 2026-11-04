@@ -57,7 +57,7 @@ punk-records scan --local --rules /absolute/path/to/experimental-rules
 
 `scan` and `review` run independently of `PUNK_RECORDS_SECURITY`. They default to
 the nearest project store, or global outside a project. `--local` requires a git
-repository or `.punk-records` (or legacy `.previously`) marker; `--global` selects only the global store.
+repository or `.punk-records` marker; `--global` selects only the global store.
 `scan` prints escaped JSON containing scanner identity, every compiled memory
 version, field-attributed matches, incomplete rule evidence, and stable reason
 codes. It scans original fields and their combined representation before ranking
@@ -110,8 +110,7 @@ approve automatically. There is no MCP approval tool. Review's exit code reports
 the scan, so approving a detected false positive still exits 1.
 
 Decisions append to global `security/reviews.jsonl`, under `PUNK_RECORDS_HOME` or
-the selected default store (`~/.local/share/punk-records` for a new install;
-`~/.local/share/previously` for an existing one). An exception binds the physical store, memory ID,
+the default store (`~/.local/share/punk-records`). An exception binds the physical store, memory ID,
 hash of all compiled content plus store/scope, scanner engine/protocol/rules hash,
 and sorted matched-rule set. Identical IDs in different stores do not share
 decisions. Accepted paths, including aliases through symlinked ancestors, are
@@ -128,13 +127,16 @@ permits an exception.
 
 ## Offline evaluation and rule maintenance
 
-Default rules are local `previously.nov` plus unchanged upstream
+Default rules are local `punk-records.nov` plus unchanged upstream
 `claude_magic_string.nov` and `delimiter_termination_probe.nov` from commit
 `3cee07e073c949bd00a8445a6eb2fd57a03ce1d2`. The upstream MIT license and per-file
 hashes are in `lib/security/rules/manifest.json`. `hidden_unicode.nov` is bundled
 unchanged but excluded from the default profile because it also uses unavailable
 semantic/LLM stages. The local rule includes keyword checks for hidden Unicode.
-The local rule name stays stable because review decisions bind the rule-set identity.
+The rebrand changes local rule names and the rule-set hash. Existing decisions
+remain in the ledger but do not approve the renamed rules. Review affected
+memories again; automatic migration must not grant new security approvals.
+The forged-role rule detects both canonical and legacy memory closing tags.
 
 The bridge uses the official `NovaRuleFileParser` and `NovaMatcher`, with explicit
 unavailable semantic/LLM evaluators and automatic LLM creation disabled. Ambient

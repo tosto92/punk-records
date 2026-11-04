@@ -5,25 +5,26 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
-const CLI = path.resolve(import.meta.dirname, '../bin/previously');
+const CLI = path.resolve(import.meta.dirname, '../bin/punk-records');
 const hasPython = spawnSync('python3', ['--version']).status === 0;
 
-test('episodes honors legacy home when the canonical override is empty', {skip: !hasPython && 'python3 not found'}, t => {
+test('sessions ignores legacy environment and directories during ordinary runtime', {skip: !hasPython && 'python3 not found'}, t => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-home-'));
   t.after(() => fs.rmSync(home, {recursive: true, force: true}));
-  const legacy = path.join(home, 'store');
+  const legacy = path.join(home, '.local/share/previously');
+  fs.mkdirSync(legacy, {recursive: true});
   const result = spawnSync('python3', ['-c', `
 import importlib.util
-spec = importlib.util.spec_from_file_location('episodes', 'lib/episodes/sessions.py')
+spec = importlib.util.spec_from_file_location('sessions', 'lib/sessions/sessions.py')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 print(m.DB)
 `], {cwd: path.dirname(path.dirname(CLI)), env: {...process.env, HOME: home, PUNK_RECORDS_HOME: '', PREVIOUSLY_HOME: legacy}, encoding: 'utf8'});
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout.trim(), path.join(legacy, 'episodes.db'));
+  assert.equal(result.stdout.trim(), path.join(home, '.local/share/punk-records/sessions.db'));
 });
 
-test('episodes indexes a Claude Code session and shows its prompts', {skip: !hasPython && 'python3 not found'}, t => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-episodes-'));
+test('sessions indexes a Claude Code session and shows its prompts', {skip: !hasPython && 'python3 not found'}, t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-sessions-'));
   t.after(() => fs.rmSync(home, {recursive: true, force: true}));
   const sid = '0b5e1d2c-0000-4000-8000-000000000001';
   const claude = path.join(home, '.claude');
@@ -33,8 +34,8 @@ test('episodes indexes a Claude Code session and shows its prompts', {skip: !has
     JSON.stringify({sessionId: sid, timestamp: Date.now(), display: '/clear', project: '/p/demo'}) + '\n');
   fs.writeFileSync(path.join(claude, 'projects', '-p-demo', `${sid}.jsonl`),
     JSON.stringify({aiTitle: 'Zebra login', gitBranch: 'feat', cwd: '/p/demo/.worktrees/feat'}) + '\n');
-const env = {...process.env, HOME: home, XDG_DATA_HOME: path.join(home, '.local/share'), PREVIOUSLY_HOME: path.join(home, 'store'), CLAUDE_CONFIG_DIR: '', CODEX_HOME: ''};
-  const run = args => spawnSync(process.execPath, [CLI, 'episodes', ...args], {env, encoding: 'utf8'});
+const env = {...process.env, HOME: home, XDG_DATA_HOME: path.join(home, '.local/share'), PUNK_RECORDS_HOME: path.join(home, 'store'), CLAUDE_CONFIG_DIR: '', CODEX_HOME: ''};
+  const run = args => spawnSync(process.execPath, [CLI, 'sessions', ...args], {env, encoding: 'utf8'});
 
   const recent = run([]);
   assert.equal(recent.status, 0, recent.stderr);
@@ -42,28 +43,28 @@ const env = {...process.env, HOME: home, XDG_DATA_HOME: path.join(home, '.local/
   assert.match(recent.stdout, /title: Zebra login/);
   assert.match(recent.stdout, new RegExp(`claude --resume ${sid}`));
   assert.doesNotMatch(recent.stdout, /\/clear/, 'slash commands are not prompts');
-  assert.ok(fs.existsSync(path.join(home, 'store', 'episodes.db')));
+  assert.ok(fs.existsSync(path.join(home, 'store', 'sessions.db')));
 
   const show = run(['show', sid.slice(0, 8)]);
   assert.equal(show.status, 0, show.stderr);
   assert.match(show.stdout, /fix the zebra login bug/);
-  assert.match(run(['--help']).stdout, /punk-records episodes timeline/);
+  assert.match(run(['--help']).stdout, /punk-records sessions timeline/);
 
   const api = JSON.parse(run(['api', '/api/session', `id=${sid.slice(0, 8)}`]).stdout);
   assert.equal(api.session.title, 'Zebra login');
   assert.match(JSON.parse(run(['api', '/api/data', 'q=zebra']).stdout).projects[0].project, /\/p\/demo/);
 });
 
-test('episodes without Python says so instead of crashing', () => {
-  const res = spawnSync(process.execPath, [CLI, 'episodes'], {env: {...process.env, PUNK_RECORDS_PYTHON: 'no-such-python-xyz'}, encoding: 'utf8'});
+test('sessions without Python says so instead of crashing', () => {
+  const res = spawnSync(process.execPath, [CLI, 'sessions'], {env: {...process.env, PUNK_RECORDS_PYTHON: 'no-such-python-xyz'}, encoding: 'utf8'});
   assert.equal(res.status, 2);
-  assert.match(res.stderr, /episodes needs Python 3\.9\+/);
+  assert.match(res.stderr, /sessions needs Python 3\.9\+/);
 });
 
 test('resume commands quote paths and session IDs as single shell arguments', {skip: !hasPython && 'python3 not found'}, () => {
   const res = spawnSync('python3', ['-c', `
 import importlib.util, shlex
-spec = importlib.util.spec_from_file_location('episodes', 'lib/episodes/sessions.py')
+spec = importlib.util.spec_from_file_location('sessions', 'lib/sessions/sessions.py')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 for tool in ('claude', 'codex', 'opencode'):
     cwd = "/tmp/my project/it's $HOME; echo unsafe"
@@ -74,8 +75,8 @@ for tool in ('claude', 'codex', 'opencode'):
   assert.equal(res.status, 0, res.stderr);
 });
 
-test('episodes imports OpenCode user prompts from its database and refreshes changed sessions', {skip: !hasPython && 'python3 not found'}, t => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-opencode-'));
+test('sessions imports OpenCode user prompts from its database and refreshes changed sessions', {skip: !hasPython && 'python3 not found'}, t => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-opencode-'));
   t.after(() => fs.rmSync(home, {recursive: true, force: true}));
   const data = path.join(home, 'data');
   fs.mkdirSync(path.join(data, 'opencode'), {recursive: true});
@@ -94,9 +95,9 @@ for mid, role, parts in [('user', 'user', [{'type':'text','text':'fix zebra'}, {
 d.commit()
 ` , source], {encoding: 'utf8'});
   assert.equal(setup.status, 0, setup.stderr);
-  const env = {...process.env, HOME: home, XDG_DATA_HOME: data, PREVIOUSLY_HOME: path.join(home, 'store'), CLAUDE_CONFIG_DIR: '', CODEX_HOME: ''};
+  const env = {...process.env, HOME: home, XDG_DATA_HOME: data, PUNK_RECORDS_HOME: path.join(home, 'store'), CLAUDE_CONFIG_DIR: '', CODEX_HOME: ''};
   const run = args => {
-    const res = spawnSync(process.execPath, [CLI, 'episodes', ...args], {env, encoding: 'utf8'});
+    const res = spawnSync(process.execPath, [CLI, 'sessions', ...args], {env, encoding: 'utf8'});
     assert.equal(res.status, 0, res.stderr);
     return res.stdout;
   };
@@ -123,10 +124,10 @@ d.commit()
   assert.equal(JSON.parse(run(['api', '/api/session', 'id=ses_zebra'])).prompts.length, 2);
 });
 
-test('episode searches find intermediate prompts consistently without duplicate sessions', {skip: !hasPython && 'python3 not found'}, () => {
+test('session searches find intermediate prompts consistently without duplicate sessions', {skip: !hasPython && 'python3 not found'}, () => {
   const res = spawnSync('python3', ['-c', `
 import importlib.util, sqlite3, time
-spec = importlib.util.spec_from_file_location('episodes', 'lib/episodes/sessions.py')
+spec = importlib.util.spec_from_file_location('sessions', 'lib/sessions/sessions.py')
 m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 db = sqlite3.connect(':memory:'); db.row_factory = sqlite3.Row; db.executescript(m.SCHEMA)
 now = time.mktime((*time.localtime()[:3], 12, 0, 0, 0, 0, -1))

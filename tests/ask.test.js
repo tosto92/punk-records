@@ -22,11 +22,10 @@ function writeScope(dir, memories) {
 }
 function fixture(t, memories) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-ask-'));
-  const names = ['PUNK_RECORDS_HOME', 'PREVIOUSLY_HOME', 'PUNK_RECORDS_SECURITY', 'PREVIOUSLY_SECURITY',
-    'PUNK_RECORDS_SYNTHESIS', 'PREVIOUSLY_SYNTHESIS'];
+  const names = ['PUNK_RECORDS_HOME', 'PUNK_RECORDS_SECURITY',
+    'PUNK_RECORDS_SYNTHESIS'];
   const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
-  Object.assign(process.env, {PUNK_RECORDS_HOME: home, PREVIOUSLY_HOME: home, PUNK_RECORDS_SECURITY: '0',
-    PREVIOUSLY_SECURITY: '0', PUNK_RECORDS_SYNTHESIS: '0', PREVIOUSLY_SYNTHESIS: '0'});
+  Object.assign(process.env, {PUNK_RECORDS_HOME: home, PUNK_RECORDS_SECURITY: '0', PUNK_RECORDS_SYNTHESIS: '0'});
   t.after(() => {
     for (const name of names) if (prior[name] === undefined) delete process.env[name]; else process.env[name] = prior[name];
     fs.rmSync(home, {recursive: true, force: true});
@@ -119,7 +118,7 @@ test('protected search gates before ranking and scans both stores in one batch',
   assert.equal(logs.length, 2);
   assert.ok(logs.every(line => line.length < 300 && /punk-records review/.test(line)));
   assert.doesNotMatch(logs.join('\n'), /quarantined|QUARANTINED|Ignore/);
-  const cli = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/previously'), 'ask', 'deploy'],
+  const cli = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/punk-records'), 'ask', 'deploy'],
     {cwd: f.repo, env: process.env, encoding: 'utf8'});
   assert.equal(cli.status, 0, cli.stderr);
   assert.match(cli.stdout, /deploy safe/);
@@ -182,7 +181,7 @@ test('unexpected scanner exceptions fail closed with bounded count-only diagnost
 });
 
 test('real NOVA save evidence gates shared retrieval before limiting', t => {
-  const names = ['PUNK_RECORDS_PYTHON', 'PREVIOUSLY_PYTHON'];
+  const names = ['PUNK_RECORDS_PYTHON'];
   const realPython = Object.fromEntries(names.map(name => [name, process.env[name]]));
   const f = securityFixture(t);
   for (const name of names) if (realPython[name] === undefined) delete process.env[name]; else process.env[name] = realPython[name];
@@ -227,8 +226,8 @@ test('automatic eligibility precedes limiting and keeps promoted activity and sy
 });
 
 test('search fixtures isolate both current and legacy environment aliases', async t => {
-  const names = ['PUNK_RECORDS_HOME', 'PREVIOUSLY_HOME', 'PUNK_RECORDS_SECURITY', 'PREVIOUSLY_SECURITY',
-    'PUNK_RECORDS_PYTHON', 'PREVIOUSLY_PYTHON', 'PUNK_RECORDS_SYNTHESIS', 'PREVIOUSLY_SYNTHESIS'];
+  const names = ['PUNK_RECORDS_HOME', 'PUNK_RECORDS_SECURITY',
+    'PUNK_RECORDS_PYTHON', 'PUNK_RECORDS_SYNTHESIS'];
   const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
   t.after(() => { for (const name of names) if (prior[name] === undefined) delete process.env[name]; else process.env[name] = prior[name]; });
   for (const name of names) process.env[name] = `/poison/${name}`;
@@ -398,7 +397,7 @@ test('automatic rarity excludes blocked and draft candidates before counting cor
 
 test('automatic rarity omits native sources and stale derived cards but admits current summaries', t => {
   const f = securityFixture(t);
-  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1', PREVIOUSLY_SYNTHESIS: '1'});
+  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1'});
   writeSecurityStore(f.home, [
     {...benign, title: 'Codex', solution: '', symptoms: '', tags: [], files: []},
     {...benign, memoryId: 'c'.repeat(40), title: 'Other note', solution: '', symptoms: 'hooks', tags: [], files: []},
@@ -441,7 +440,7 @@ test('protected retrieval keeps good hits when matching memories exceed one scan
 
 test('automatic summary admission still scans a hidden draft dependency', t => {
   const f = securityFixture(t);
-  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1', PREVIOUSLY_SYNTHESIS: '1'});
+  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1'});
   writeSecurityStore(f.home, [{...benign, type: 'note', tags: ['auto'], outcome: 'open', solution: '', symptoms: 'DRAFT_DEPENDENCY'}]);
   const options = {store: f.home, scope: 'global'};
   const request = prepareSynthesis({...options, group: 'reference', memoryRefs: [benignId]});

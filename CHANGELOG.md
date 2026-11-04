@@ -3,7 +3,8 @@
 ## 0.1.0 — unreleased
 
 First public release as Punk Records. New installs use Punk Records IDs and
-paths; the `previously` command and existing memory stores remain compatible.
+paths. Installation migration recognizes the previous names; runtime uses only
+the canonical commands and variables.
 
 - Recall: eligible memories matching the prompt are injected automatically;
   activity drafts and raw native Markdown sources are excluded from automatic
@@ -15,8 +16,8 @@ paths; the `previously` command and existing memory stores remain compatible.
   `full: true` for an explicit full result.
 - `punk-records save / ask / build / check / graph / migrate`, MCP server
   (`memory_find`, `memory_save`, `memory_freshness`), skill and
-  `/punk-records-save` command (legacy `/previously-save` alias).
-- `punk-records episodes`: index of past Claude Code and Codex sessions with
+  `/punk-records-save` command.
+- `punk-records sessions`: index of past Claude Code and Codex sessions with
   resume commands, plus a local web page and skill.
 - Plugins for Claude Code and Codex; `punk-records init` for every agent.
 - Optional incremental synthesis of explicitly selected memories and native
@@ -25,3 +26,8 @@ paths; the `previously` command and existing memory stores remain compatible.
 - **Synthesis** in `punk-records serve`: inspect source groups and saved runs,
   compare drafts with captured evidence, and publish an entire request with
   freshness checks. Publication receipts support external review-first jobs.
+
+- Complete rebrand: canonical hooks, OpenCode plugin, session browser and skills;
+  safe init migration of owned legacy configuration and storage.
+- Canonical security rule names and detection of forged current memory tags;
+  old approval records do not implicitly authorize the new rule set.

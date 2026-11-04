@@ -61,8 +61,8 @@ test('ambiguous migration requires explicit valid target and unchanged source', 
 
 test('CLI migrate defaults to preview and rejects stale apply', t => {
   const {dir, file, raw} = fixture(t, [event]);
-  const cli = path.resolve(import.meta.dirname, '../bin/previously');
-  const options = {env: {...process.env, PREVIOUSLY_HOME: dir}, encoding: 'utf8'};
+  const cli = path.resolve(import.meta.dirname, '../bin/punk-records');
+  const options = {env: {...process.env, PUNK_RECORDS_HOME: dir}, encoding: 'utf8'};
   const run = spawnSync(process.execPath, [cli, 'migrate', '--global', '--dry-run'], options);
   assert.equal(run.status, 0);
   assert.equal(JSON.parse(run.stdout).mappings.length, 1);

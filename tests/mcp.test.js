@@ -37,7 +37,7 @@ test('MCP validates envelopes before treating them as notifications', () => {
 test('MCP continues on the same process after malformed JSON and invalid envelopes', () => {
   const messages = [null, 1, [], {}, {jsonrpc: '2.0', method: 'notifications/initialized'},
     {jsonrpc: '2.0', id: 'after-invalid', method: 'tools/list'}];
-  const res = spawnSync(process.execPath, [path.join(ROOT, 'bin', 'previously'), 'mcp'], {
+  const res = spawnSync(process.execPath, [path.join(ROOT, 'bin', 'punk-records'), 'mcp'], {
     cwd: ROOT, input: '{broken\n' + messages.map(JSON.stringify).join('\n') + '\n', encoding: 'utf8', timeout: 5000,
   });
   assert.equal(res.status, 0, res.stderr);
@@ -102,10 +102,10 @@ function writeScope(dir, memories) {
 }
 
 function startMcp({ home, cwd, args = [] }) {
-  const child = spawn(process.execPath, [path.join(ROOT, "bin", "previously"), "mcp", ...args], {
+  const child = spawn(process.execPath, [path.join(ROOT, "bin", "punk-records"), "mcp", ...args], {
     cwd,
-    env: { ...process.env, PUNK_RECORDS_HOME: home, PREVIOUSLY_HOME: home,
-      PUNK_RECORDS_SECURITY: '0', PREVIOUSLY_SECURITY: '0', PUNK_RECORDS_SYNTHESIS: '0', PREVIOUSLY_SYNTHESIS: '0' },
+    env: { ...process.env, PUNK_RECORDS_HOME: home,
+      PUNK_RECORDS_SECURITY: '0', PUNK_RECORDS_SYNTHESIS: '0' },
     stdio: ["pipe", "pipe", "pipe"],
   });
   let buf = "";
@@ -141,8 +141,8 @@ function startMcp({ home, cwd, args = [] }) {
 }
 
 test("mcp lists 3 tools and memory_find returns ranked hits", async () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-home-"));
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-cwd-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-home-"));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-cwd-"));
   writeScope(home, [
     {
       slug: "auth-bug",
@@ -186,8 +186,8 @@ test("mcp lists 3 tools and memory_find returns ranked hits", async () => {
 });
 
 test("memory_save accepts attempt singular and comma-string files/tags; memory_freshness reports drift", async () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-home2-"));
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-cwd2-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-home2-"));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-cwd2-"));
   const { child, call, notify } = startMcp({ home, cwd });
   try {
     await call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "0" } });
@@ -224,8 +224,8 @@ test("memory_save accepts attempt singular and comma-string files/tags; memory_f
 });
 
 test("memory_save rejects out-of-enum scope with -32602", async () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-home4-"));
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-cwd4-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-home4-"));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-cwd4-"));
   const { child, call, notify } = startMcp({ home, cwd });
   try {
     await call("initialize", { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "0" } });
@@ -244,8 +244,8 @@ test("memory_save rejects out-of-enum scope with -32602", async () => {
 });
 
 test("unknown method returns JSON-RPC -32601", async () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-home3-"));
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "previously-mcp-cwd3-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-home3-"));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-mcp-cwd3-"));
   const { child, call } = startMcp({ home, cwd });
   try {
     const res = await call("bogus/method", {});

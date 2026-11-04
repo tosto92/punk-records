@@ -1,12 +1,12 @@
 {
   "upstreamCommit": "3cee07e073c949bd00a8445a6eb2fd57a03ce1d2",
   "default": [
-    "previously.nov",
+    "punk-records.nov",
     "upstream/claude_magic_string.nov",
     "upstream/delimiter_termination_probe.nov"
   ],
   "sha256": {
-    "previously.nov": "620f1fc734aa5bd4eed520a6b6946b2b65f4b7046f0d84ff19686dbf9ee348ad",
+    "punk-records.nov": "e39d324067f64f0ed8430f9bfb05a8c1e03d76aab6c86c7353e4dd3066806dfa",
     "upstream/LICENSE": "a8bcc4903a4c0a3f7946a7519af0df20fa00f09258a64bff54c390f0bd7ff8dd",
     "upstream/claude_magic_string.nov": "8b098b1e2016c894571769b4fb073f02f7a1c37e4ed1a1ad7a25d3d4216200b5",
     "upstream/delimiter_termination_probe.nov": "d695b2da32bed66fc6211314dc3ce8ba3d818b80c5d6d4549ed3807359d2c848",

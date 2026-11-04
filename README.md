@@ -32,8 +32,8 @@ flowchart LR
 | **memory** | a saved fix, decision or failed attempt |
 | **draft** | an activity record that may be saved when a supported hook observes successful file edits |
 | **synthesis** | a derived summary of an explicitly selected source group, published after review by default |
-| **episodes** | your past Claude Code, Codex and OpenCode sessions, browsable with `punk-records episodes` |
-| **project** | how the episodes page groups sessions |
+| **sessions** | your past Claude Code, Codex and OpenCode sessions, browsable with `punk-records sessions` |
+| **project** | how the sessions page groups sessions |
 | **resume command** | returns to a past session where you left off |
 
 ## What the agent sees
@@ -54,7 +54,7 @@ covers: src/auth/session.ts
 
 ## Install
 
-Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for `episodes`.
+Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for `sessions`.
 Optional memory protection requires Python 3.10+ and pinned NOVA in a dedicated
 venv; it makes no model or provider calls.
 
@@ -81,9 +81,7 @@ punk-records init --global      # from a clone: node bin/punk-records init --glo
 
 `init --global` wires every agent for all your projects: recall and capture
 hooks, the `punk-records` MCP server, the skills and a `/punk-records-save`
-command. It links both `~/.local/bin/punk-records` and the legacy
-`~/.local/bin/previously` command; keep that directory
-on your `PATH`.
+command. It links `~/.local/bin/punk-records`; keep that directory on your `PATH`.
 Limit it with `--agents claude,codex,opencode`; preview with `--dry-run`.
 
 Pick **one** of the two for each agent: the plugin and `init --global` both
@@ -99,7 +97,7 @@ The skills teach the agent when and how to recall and save, so plain requests
 work, in any language. Use `/punk-records` in Claude Code and OpenCode or
 `$punk-records` in Codex. With the Claude Code plugin it is namespaced as
 `/punk-records:punk-records`. The `/punk-records-save` command walks the agent
-through saving one memory. Legacy `previously` skill and command names still work.
+through saving one memory.
 
 | You say | The agent runs |
 |---|---|
@@ -108,8 +106,8 @@ through saving one memory. Legacy `previously` skill and command names still wor
 | *Save this as a global memory: I always use pnpm, never npm* | `punk-records save --global --type decision …` |
 | *That approach didn't work, keep it so nobody retries it* | `punk-records save --type attempt_failed …` |
 | *Turn this session's draft into a saved memory* | `punk-records save --ref <draft slug> --type solved …` |
-| *Where did I leave off on the api project?* | `punk-records episodes projects api`, then the resume command |
-| *What did I work on yesterday?* | `punk-records episodes timeline -d 2` |
+| *Where did I leave off on the api project?* | `punk-records sessions projects api`, then the resume command |
+| *What did I work on yesterday?* | `punk-records sessions timeline -d 2` |
 
 Automatic recall conservatively matches topical words, ignores common Italian/English filler, and stays empty when evidence is weak or the prompt is only an operational confirmation. It omits activity drafts and raw native Markdown sources. For broader retrieval, use an explicit `punk-records ask "<query>"` or `memory_find` search; their matching and scores are unchanged. A draft is only an activity summary of recorded edits, not a learned solution. It is not guaranteed for every session: it needs autosave enabled and supported, successfully observed file edits. Investigation-only sessions do not create a meaningful memory automatically; the agent must choose to save a useful finding. After you promote a draft, later automatic captures from that session leave the memory unchanged.
 
@@ -135,12 +133,12 @@ and are not automatically recovered or merged.
 punk-records init                   # optional, in a repo: commit agent config for your team
 punk-records ask "<symptoms, errors or file names>"
 punk-records save --type solved --title "…" --symptoms "…" --solution "…" --files src/a.ts
-punk-records serve --open           # web UI: memories + episodes + synthesis (= graph --serve)
+punk-records serve --open           # web UI: memories + sessions + synthesis (= graph --serve)
 punk-records --help
 ```
 
 The web viewer binds to `127.0.0.1` and checks the request host and origin on
-all routes, including memory and episode reads. Use the exact URL it prints;
+all routes, including memory and session reads. Use the exact URL it prints;
 other hostnames and cross-site requests are rejected.
 
 Agents mostly do this themselves: the skill tells them to recall before
@@ -199,27 +197,26 @@ automatically. Saving, rebuilding, and `outcome: ok` are not approval; absence o
 signals is neither proof of truth nor permission to act. Direct Markdown reads
 bypass the gate, and the local review ledger cannot authenticate same-user writes.
 
-## Episodes
+## Sessions
 
 ```sh
-punk-records episodes                 # recent sessions, each with its resume command
-punk-records episodes projects        # per project: where you left off
-punk-records episodes timeline -d 7   # day → project → sessions
-punk-records episodes show 0b5e1d2c   # every prompt of one session
-punk-records serve                    # the same in the web UI (Episodes tab)
+punk-records sessions                 # recent sessions, each with its resume command
+punk-records sessions projects        # per project: where you left off
+punk-records sessions timeline -d 7   # day → project → sessions
+punk-records sessions show 0b5e1d2c   # every prompt of one session
+punk-records serve                    # the same in the web UI (Sessions tab)
 ```
 
 A read-only SQLite index of `~/.claude`, `~/.codex` and
 `~/.local/share/opencode/opencode.db` (respecting `CLAUDE_CONFIG_DIR`,
 `CODEX_HOME` and `XDG_DATA_HOME`), synced on every call into
-`~/.local/share/punk-records/episodes.db` for a new installation (existing
-`~/.local/share/previously` stores keep their path).
-Needs Python 3.9+. The `punk-records-episodes` skill lets the agent answer
+`~/.local/share/punk-records/sessions.db` (override the store with `PUNK_RECORDS_HOME`).
+Needs Python 3.9+. The `punk-records-sessions` skill lets the agent answer
 "where was I?" itself.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/episodes-dark.png">
-  <img alt="The episodes page: past sessions grouped by day and project, with the agent, branch and prompt count" src="docs/images/episodes-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/sessions-dark.png">
+  <img alt="The sessions page: past sessions grouped by day and project, with the agent, branch and prompt count" src="docs/images/sessions-light.png">
 </picture>
 
 ## Where memories live
@@ -231,7 +228,7 @@ draft, lands in the nearest project:
 | Where the session works | Where memories are saved |
 |---|---|
 | inside a git repo | `<repo>/memory/events.jsonl`, created on the first save |
-| a folder marked with `.punk-records` or legacy `.previously` | `<folder>/memory/events.jsonl` |
+| a folder marked with `.punk-records` | `<folder>/memory/events.jsonl` |
 | anywhere else | the global store, `~/.local/share/punk-records` for a new install (override with `PUNK_RECORDS_HOME`) |
 
 Recall reads both the project's memories and your global ones. Use
@@ -254,44 +251,65 @@ Recall reads both the project's memories and your global ones. Use
 
 ## Uninstall
 
-`init` also keeps legacy aliases named `previously`; remove both names by hand:
+Remove the entries installed for the selected agents:
 
-- global: `~/.claude/settings.json` and `~/.codex/hooks.json` (hooks running
-  `previously hook` or `punk-records hook`), `~/.claude.json` and
-  `~/.config/opencode/opencode.json` (MCP server `punk-records` or `previously`),
-  `~/.codex/config.toml` (the `# punk-records:start` block, or its legacy
-  `# previously:start` form), and the `punk-records*` and `previously*` links
-  under agent skill/command directories, plus
-  `~/.config/opencode/plugins/previously.ts` and both names in `~/.local/bin/`;
-- per repo: the same entries in `.claude/`, `.codex/`, `.agents/`,
+- global: Punk Records hooks in `~/.claude/settings.json` and `~/.codex/hooks.json`,
+  the `punk-records` MCP entry in `~/.claude.json` and
+  `~/.config/opencode/opencode.json`, and the `# punk-records:start` block in
+  `~/.codex/config.toml`;
+- installed Punk Records skills and commands, including the explicit
+  `brainbrain` aliases, the `punk-records.ts` OpenCode plugin and CLI links;
+- per repo: the corresponding entries in `.claude/`, `.codex/`, `.agents/`,
   `.opencode/`, `.mcp.json`, `opencode.json`, and the block between
   `<!-- punk-records:start -->` and `<!-- punk-records:end -->` in `AGENTS.md`
-  and `CLAUDE.md` (or the legacy `previously` markers).
+  and `CLAUDE.md`.
+
+Preserve entries belonging to other tools.
 
 Your memories stay in `memory/` and the selected global store until you delete them.
 
-## Compatibility notes
+## Upgrading an existing installation
 
-The `previously` CLI and skill aliases, `.previously` project marker,
-`PREVIOUSLY_*` environment variables, and existing storage paths remain valid.
-`init` migrates its own legacy MCP IDs in place; existing memories need no
-migration. New configuration uses `punk-records` IDs and `PUNK_RECORDS_*` variables.
-Hook commands retain the `previously` alias for compatibility. Claude local
-`init` skips events covered globally and removes safe redundant local handlers
-on re-init; after adding global hooks, re-run local `init` in existing projects.
-Generated hooks retain a 10-second timeout; re-init preserves custom budgets,
-including 30 seconds, and synthesis-enabled commands. Ambiguous hook events
-are left unchanged with warnings, without adding unconditional handlers. This does not
-guarantee runtime deduplication across settings, plugins or skills; see the
-[compatibility notes](docs/claude-codex-compatibility.md). The OpenCode loader
-filename and NOVA rule identifiers retain their legacy names to avoid duplicate
-plugin loading and invalidating existing review decisions.
+Runtime commands, skills, configuration variables and project markers now use
+Punk Records names. The CLI for browsing sessions is `punk-records sessions`.
+`brainbrain` and `brainbrain-synthesize` remain explicit shortcut commands.
 
-To upgrade an npm installation once the new package is published, run
-`npm uninstall -g previously-on-localhost`, then `npm install -g punk-records`
-and `punk-records init --global`. Init updates links left by the old package.
-If you installed the old agent plugin, remove it before installing the renamed
-plugin to avoid running both sets of hooks.
+Close active agent sessions and viewer processes before migrating shared storage.
+Run `punk-records init --global --dry-run` to inspect global configuration and
+storage migration, then run it without `--dry-run`. Run `punk-records init --local`
+in each previously configured project as well: global init does not rewrite
+other repositories. Restart agent sessions after changing hooks or MCP settings;
+Codex may require approval for the new hook commands.
+
+The installer recognizes owned legacy `previously` hooks, MCP entries, links,
+skills and markers. It moves the default `~/.local/share/previously` store to
+`~/.local/share/punk-records` and renames `episodes.db` to `sessions.db` when safe.
+Conflicting stores, duplicate or quoted managed TOML environment keys, or ambiguous
+ownership require reconciliation; the installer must not overwrite them.
+If a legacy SQLite database has journal/WAL sidecars, stop its users and checkpoint
+the database before rerunning init. Review any warnings before removing old installations.
+Use `PUNK_RECORDS_*` variables in shell profiles and launchers; `PREVIOUSLY_*`
+variables no longer configure the runtime. Init stops with an actionable error
+if the calling shell still exports a nonempty legacy variable. Custom shell commands and scripts
+must be updated explicitly; init does not rewrite shell profiles. A preexisting
+`~/.local/bin/previously` link is retained with a warning because other projects
+may still call it. After migrating those projects and custom launchers, remove
+that link manually. Fresh installs do not create it.
+
+For an old npm package, uninstall `previously-on-localhost`, install `punk-records`,
+and run the migration above. Remove an old agent plugin before enabling its
+replacement to avoid duplicate hooks. Existing `episodes` commands should be
+updated to `sessions`; there is no permanent CLI alias.
+
+Generated hooks retain a 10-second timeout; re-init preserves custom budgets
+and synthesis-enabled commands. Ambiguous handlers are preserved with warnings.
+Claude local init reconciles redundant local hooks against global coverage;
+see [agent compatibility](docs/claude-codex-compatibility.md).
+
+Security rule names and hashes change in this release. Old approval records are
+preserved as evidence but do not authorize the new rule set: review affected
+memories again with `punk-records review`. Browser preferences are imported from
+the old keys on first use of the new viewer when available at the same origin.
 
 `docs/` records the agent behaviour this relies on, verified against real
 Claude Code, Codex and OpenCode releases.

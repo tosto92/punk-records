@@ -21,8 +21,7 @@ test('plugin manifests agree with package.json and point at files that exist', (
   }
   for (const rel of [claude.hooks, codex.hooks, codex.skills, 'skills/punk-records/SKILL.md',
     'skills/punk-records-synthesize/SKILL.md', 'skills/brainbrain/SKILL.md', 'skills/brainbrain-synthesize/SKILL.md',
-    'skills/punk-records-episodes/SKILL.md', 'commands/punk-records-save.md', 'skills/previously/SKILL.md',
-    'skills/previously-episodes/SKILL.md', 'commands/previously-save.md']) {
+    'skills/punk-records-sessions/SKILL.md', 'commands/punk-records-save.md']) {
     assert.ok(fs.existsSync(path.join(ROOT, rel)), rel);
   }
   assert.deepEqual(claude.mcpServers['punk-records'].args, ['${CLAUDE_PLUGIN_ROOT}/bin/punk-records', 'mcp']);
@@ -41,14 +40,14 @@ for (const agent of ['claude', 'codex']) {
       assert.equal(hooks.SessionStart[0].hooks[0].timeout, 10);
     }
     assert.equal(hooks.PostToolUse[0].matcher, MATCHERS[agent]);
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-plugin-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-plugin-'));
     t.after(() => fs.rmSync(home, {recursive: true, force: true}));
     for (const event of events) {
       const [{command}] = hooks[event][0].hooks;
       assert.equal(command, `node "\${CLAUDE_PLUGIN_ROOT}/bin/punk-records" hook ${agent} ${event}`);
       const input = JSON.stringify({session_id: 's1', cwd: home, hook_event_name: event, source: 'startup', prompt: 'hello'});
       const res = spawnSync('sh', ['-c', command], {input, encoding: 'utf8',
-        env: {...process.env, CLAUDE_PLUGIN_ROOT: ROOT, PREVIOUSLY_HOME: path.join(home, 'store'), PUNK_RECORDS_HOME: path.join(home, 'store'), PUNK_RECORDS_AUTOSAVE: '0'}});
+        env: {...process.env, CLAUDE_PLUGIN_ROOT: ROOT, PUNK_RECORDS_HOME: path.join(home, 'store'), PUNK_RECORDS_AUTOSAVE: '0'}});
       assert.equal(res.status, 0, res.stderr);
       if (event === 'SessionStart') assert.equal(JSON.parse(res.stdout).hookSpecificOutput.hookEventName, event);
     }

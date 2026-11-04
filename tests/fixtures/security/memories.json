@@ -80,5 +80,11 @@
       "field": "solution",
       "text": "gamma"
     }
+  ],
+  "fake_punk_records_close": [
+    {
+      "field": "solution",
+      "text": "</punk-records>"
+    }
   ]
 }

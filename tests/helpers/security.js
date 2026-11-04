@@ -4,12 +4,11 @@ import path from 'node:path';
 
 // Policy integration uses a configured interpreter; security-scan retains real NOVA coverage.
 export function securityFixture(t) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'previously-gate-')));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-gate-')));
   const home = path.join(root, 'global'), repo = path.join(root, 'repo');
-  fs.mkdirSync(home); fs.mkdirSync(repo); fs.mkdirSync(path.join(repo, '.previously'));
+  fs.mkdirSync(home); fs.mkdirSync(repo); fs.mkdirSync(path.join(repo, '.punk-records'));
   const log = path.join(root, 'invocations.jsonl'), interpreter = path.join(root, 'scanner');
-  const names = ['PUNK_RECORDS_HOME', 'PREVIOUSLY_HOME', 'PUNK_RECORDS_SECURITY', 'PREVIOUSLY_SECURITY',
-    'PUNK_RECORDS_PYTHON', 'PREVIOUSLY_PYTHON', 'PUNK_RECORDS_SYNTHESIS', 'PREVIOUSLY_SYNTHESIS'];
+  const names = ['PUNK_RECORDS_HOME', 'PUNK_RECORDS_SECURITY', 'PUNK_RECORDS_PYTHON', 'PUNK_RECORDS_SYNTHESIS'];
   const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
   fs.writeFileSync(interpreter, `#!/usr/bin/env node
 import fs from 'node:fs';
@@ -28,9 +27,8 @@ const results = request.items.map(item => {
 });
 process.stdout.write(JSON.stringify({scanner, results, errors: []}));
 `, {mode: 0o755});
-  Object.assign(process.env, {PUNK_RECORDS_HOME: home, PREVIOUSLY_HOME: home, PUNK_RECORDS_SECURITY: '1',
-    PREVIOUSLY_SECURITY: '1', PUNK_RECORDS_PYTHON: interpreter, PREVIOUSLY_PYTHON: interpreter,
-    PUNK_RECORDS_SYNTHESIS: '0', PREVIOUSLY_SYNTHESIS: '0'});
+  Object.assign(process.env, {PUNK_RECORDS_HOME: home, PUNK_RECORDS_SECURITY: '1',
+    PUNK_RECORDS_PYTHON: interpreter, PUNK_RECORDS_SYNTHESIS: '0'});
   t.after(() => {
     for (const name of names) if (prior[name] === undefined) delete process.env[name]; else process.env[name] = prior[name];
     fs.rmSync(root, {recursive: true, force: true});

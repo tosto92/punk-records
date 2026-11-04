@@ -120,7 +120,7 @@ function snapshot(dir) {
 }
 
 test("build dedups same problem and accumulates failed attempts", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "previously-build-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-build-"));
   const line = (o) => JSON.stringify(o) + "\n";
   const first = {
     v: 1,
@@ -212,7 +212,7 @@ test("build dedups same problem and accumulates failed attempts", () => {
 });
 
 test("ref event before its target still merges into one node", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "previously-build-reffirst-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-build-reffirst-"));
   const line = (o) => JSON.stringify(o) + "\n";
   const target = {
     v: 1,
@@ -270,11 +270,11 @@ test("ref event before its target still merges into one node", () => {
 
 test("buildAll default builds both global and repo scopes inside a repo", () => {
   // realpath: on macOS os.tmpdir() is a /var symlink to /private/var, and git reports the real path.
-  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "previously-build-both-repo-")));
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-build-both-home-"));
+  const repo = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-build-both-repo-")));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-build-both-home-"));
   execFileSync("git", ["init", "-q"], { cwd: repo });
-  const prevHome = process.env.PREVIOUSLY_HOME;
-  process.env.PREVIOUSLY_HOME = home;
+  const prevHome = process.env.PUNK_RECORDS_HOME;
+  process.env.PUNK_RECORDS_HOME = home;
   try {
     const resolved = resolveScopes({}, repo);
     assert.equal(resolved.repoRoot, repo);
@@ -285,14 +285,14 @@ test("buildAll default builds both global and repo scopes inside a repo", () => 
     assert.ok(fs.existsSync(path.join(repo, "memory", "index.json")), "repo scope must be built");
 
     // The CLI default must produce the identical scope set.
-    execFileSync("node", [path.resolve(import.meta.dirname, "..", "bin", "previously"), "build"], {
+    execFileSync("node", [path.resolve(import.meta.dirname, "..", "bin", "punk-records"), "build"], {
       cwd: repo,
-      env: { ...process.env, PREVIOUSLY_HOME: home },
+      env: { ...process.env, PUNK_RECORDS_HOME: home },
     });
     assert.ok(fs.existsSync(path.join(home, "index.json")));
     assert.ok(fs.existsSync(path.join(repo, "memory", "index.json")));
   } finally {
-    if (prevHome === undefined) delete process.env.PREVIOUSLY_HOME;
-    else process.env.PREVIOUSLY_HOME = prevHome;
+    if (prevHome === undefined) delete process.env.PUNK_RECORDS_HOME;
+    else process.env.PUNK_RECORDS_HOME = prevHome;
   }
 });

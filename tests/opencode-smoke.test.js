@@ -39,18 +39,18 @@ for (const [label, variable, api, installation] of matrix) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-runtime-smoke-'));
     const cwd = path.join(root, 'project'); fs.mkdirSync(cwd);
     t.after(() => fs.rmSync(root, {recursive: true, force: true}));
-    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OPENCODE_|PREVIOUSLY_|XDG_|OPENAI_|ANTHROPIC_)/.test(key)));
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OPENCODE_|PUNK_RECORDS_|XDG_|OPENAI_|ANTHROPIC_)/.test(key)));
     Object.assign(env, {HOME: path.join(root, 'home'), PWD: cwd,
       XDG_CONFIG_HOME: path.join(root, 'config'), XDG_DATA_HOME: path.join(root, 'data'),
       XDG_CACHE_HOME: path.join(root, 'cache'), XDG_STATE_HOME: path.join(root, 'state'), XDG_RUNTIME_DIR: path.join(root, 'run'),
-      PREVIOUSLY_HOME: path.join(root, 'memory-global'), OPENCODE_DISABLE_DEFAULT_PLUGINS: 'true',
+      PUNK_RECORDS_HOME: path.join(root, 'memory-global'), OPENCODE_DISABLE_DEFAULT_PLUGINS: 'true',
       OPENCODE_DISABLE_MODELS_FETCH: 'true', OPENCODE_MODELS_PATH: path.join(root, 'models.json')});
     for (const key of ['HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_STATE_HOME', 'XDG_RUNTIME_DIR']) fs.mkdirSync(env[key], {recursive: true});
     fs.writeFileSync(env.OPENCODE_MODELS_PATH, '{}');
     execFileSync('git', ['init', '-q'], {cwd, env});
     const configDir = path.join(env.XDG_CONFIG_HOME, 'opencode');
-    const overrides = {PREVIOUSLY_HOME: env.PREVIOUSLY_HOME, PREVIOUSLY_PLUGINS: path.join(configDir, 'plugins'),
-      PREVIOUSLY_CONFIG: path.join(configDir, 'opencode.json'), PREVIOUSLY_SKILLS: path.join(configDir, 'skills')};
+    const overrides = {PUNK_RECORDS_HOME: env.PUNK_RECORDS_HOME, PUNK_RECORDS_PLUGINS: path.join(configDir, 'plugins'),
+      PUNK_RECORDS_CONFIG: path.join(configDir, 'opencode.json'), PUNK_RECORDS_SKILLS: path.join(configDir, 'skills')};
     // In-process initRepo also resolves ~/.claude and ~/.codex: sandbox HOME too.
     const previous = Object.fromEntries([...Object.keys(overrides), 'HOME', 'CLAUDE_CONFIG_DIR', 'CODEX_HOME'].map(key => [key, process.env[key]]));
     Object.assign(process.env, overrides, {HOME: env.HOME});
@@ -78,7 +78,7 @@ for (const [label, variable, api, installation] of matrix) {
     await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve));
     const baseURL = `http://127.0.0.1:${provider.address().port}/v1`;
     const model = {test: {name: 'test', limit: {context: 100000, output: 1000}}};
-    const configFile = installation === 'local' ? path.join(cwd, 'opencode.json') : overrides.PREVIOUSLY_CONFIG;
+    const configFile = installation === 'local' ? path.join(cwd, 'opencode.json') : overrides.PUNK_RECORDS_CONFIG;
     const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
     Object.assign(config, api === 'v1' ? {model: 'local/test', permission: 'allow', provider: {local: {npm: '@ai-sdk/openai-compatible', options: {baseURL, apiKey: 'fixture'}, models: model}}}
       : {providers: {local: {package: '@opencode/ai/providers/openai-compatible', settings: {baseURL, apiKey: 'fixture'}, models: model}}});

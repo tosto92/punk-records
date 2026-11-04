@@ -48,16 +48,16 @@ test('record diagnostics identify invalid schema and incomplete line numbers', (
 test('CLI rejects unsafe ref before creating a register', (t) => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-cli-invalid-'));
   t.after(() => fs.rmSync(home, {recursive: true, force: true}));
-  const run = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/previously'), 'save',
+  const run = spawnSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/punk-records'), 'save',
     '--global', '--type', 'note', '--title', 'unsafe', '--ref', '../../outside'],
-    {env: {...process.env, PREVIOUSLY_HOME: home}, encoding: 'utf8'});
+    {env: {...process.env, PUNK_RECORDS_HOME: home}, encoding: 'utf8'});
   assert.equal(run.status, 2);
   assert.equal(fs.existsSync(path.join(home, 'events.jsonl')), false);
 });
 
 test("save appends one atomic line and readEvents round-trips, skipping bad lines", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "previously-"));
-  process.env.PREVIOUSLY_HOME = dir;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-"));
+  process.env.PUNK_RECORDS_HOME = dir;
   const resolved = { writes: ["global"], repoRoot: null, repoName: "" };
   const e1 = normalizeEvent({ type: "note", title: "first" }, resolved);
   const e2 = normalizeEvent({ type: "solved", title: "second", outcome: "ok" }, resolved);
@@ -75,9 +75,9 @@ test("save appends one atomic line and readEvents round-trips, skipping bad line
 
 test("default scope is repo inside git, global outside", () => {
   // realpath: on macOS os.tmpdir() is a /var symlink to /private/var, and git reports the real path.
-  const inside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "previously-repo-")));
+  const inside = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-repo-")));
   execFileSync("git", ["init", "-q"], { cwd: inside });
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "previously-out-"));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-out-"));
   assert.deepEqual(resolveScopes({}, inside).writes, ["local"]);
   assert.equal(resolveScopes({}, inside).repoRoot, inside);
   assert.deepEqual(resolveScopes({}, outside).writes, ["global"]);
@@ -86,18 +86,18 @@ test("default scope is repo inside git, global outside", () => {
   assert.deepEqual(resolveScopes({ explicit: "local" }, outside).writes, ["local"]);
 });
 
-test("previously save CLI appends event and enforces required flags", () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-home-"));
-  const env = { ...process.env, PREVIOUSLY_HOME: home };
+test("punk-records save CLI appends event and enforces required flags", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-home-"));
+  const env = { ...process.env, PUNK_RECORDS_HOME: home };
   try {
-    execFileSync("node", ["bin/previously", "save", "--type", "note"], { env, cwd: path.resolve(import.meta.dirname, "..") });
+    execFileSync("node", ["bin/punk-records", "save", "--type", "note"], { env, cwd: path.resolve(import.meta.dirname, "..") });
     assert.fail("missing --title should exit non-zero");
   } catch (err) {
     assert.equal(err.status, 2);
   }
   execFileSync(
     "node",
-    ["bin/previously", "save", "--type", "note", "--title", "cli works", "--tags", "a,b", "--global"],
+    ["bin/punk-records", "save", "--type", "note", "--title", "cli works", "--tags", "a,b", "--global"],
     { env, cwd: path.resolve(import.meta.dirname, "..") },
   );
   const events = readEvents(home);
@@ -108,7 +108,7 @@ test("previously save CLI appends event and enforces required flags", () => {
 
 test("unknown subcommand exits 2", () => {
   try {
-    execFileSync("node", ["bin/previously", "frobnicate"], { cwd: path.resolve(import.meta.dirname, "..") });
+    execFileSync("node", ["bin/punk-records", "frobnicate"], { cwd: path.resolve(import.meta.dirname, "..") });
     assert.fail("should exit non-zero");
   } catch (err) {
     assert.equal(err.status, 2);
@@ -116,11 +116,11 @@ test("unknown subcommand exits 2", () => {
 });
 
 test("flag parser rejects flag-like values and conflicting scope flags", () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-guard-home-"));
-  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "previously-guard-repo-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-guard-home-"));
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-guard-repo-"));
   execFileSync("git", ["init", "-q"], { cwd: repo });
-  const env = { ...process.env, PREVIOUSLY_HOME: home };
-  const mem = path.resolve(import.meta.dirname, "..", "bin", "previously");
+  const env = { ...process.env, PUNK_RECORDS_HOME: home };
+  const mem = path.resolve(import.meta.dirname, "..", "bin", "punk-records");
   try {
     execFileSync("node", [mem, "save", "--type", "--title", "x"], { env, cwd: repo, stdio: "pipe" });
     assert.fail("--type consuming --title should exit 2");

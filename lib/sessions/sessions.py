@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Episodes: SQLite index of past Claude Code, Codex + OpenCode sessions across all projects.
+"""Sessions: SQLite index of past Claude Code, Codex + OpenCode sessions across all projects.
 
 usage:
-  punk-records episodes [filter] [-n N]          recent episodes with resume command
-  punk-records episodes timeline [filter] [-d D] day -> project -> episodes, last D days (default 7)
-  punk-records episodes projects [filter]        one line per project: where you left off
-  punk-records episodes show <id-prefix>         every prompt of one episode
-  punk-records serve [--port n]                  web UI (memories + episodes) on http://127.0.0.1:4400/episodes
-  sqlite3 ~/.local/share/punk-records/episodes.db  ad-hoc queries for new stores (tables: sessions, prompts; view: v)
+  punk-records sessions [filter] [-n N]          recent sessions with resume command
+  punk-records sessions timeline [filter] [-d D] day -> project -> sessions, last D days (default 7)
+  punk-records sessions projects [filter]        one line per project: where you left off
+  punk-records sessions show <id-prefix>         every prompt of one session
+  punk-records serve [--port n]                  web UI (memories + sessions) on http://127.0.0.1:4400/sessions
+  sqlite3 ~/.local/share/punk-records/sessions.db  ad-hoc queries for new stores (tables: sessions, prompts; view: v)
 
 Every run syncs incrementally from ~/.claude, ~/.codex and OpenCode's opencode.db
 first (CLAUDE_CONFIG_DIR, CODEX_HOME and XDG_DATA_HOME are honoured).
@@ -21,9 +21,7 @@ H = Path.home()
 CLAUDE = Path(os.environ.get("CLAUDE_CONFIG_DIR") or H / ".claude")
 CODEX = Path(os.environ.get("CODEX_HOME") or H / ".codex")
 OPENCODE = Path(os.environ.get("XDG_DATA_HOME") or H / ".local/share") / "opencode/opencode.db"
-LEGACY_HOME = H / ".local/share/previously"
-DB = Path(os.environ.get("PUNK_RECORDS_HOME") or os.environ.get("PREVIOUSLY_HOME") or
-          (LEGACY_HOME if LEGACY_HOME.exists() else H / ".local/share/punk-records")) / "episodes.db"
+DB = Path(os.environ.get("PUNK_RECORDS_HOME") or H / ".local/share/punk-records") / "sessions.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions(
@@ -217,7 +215,7 @@ def cmd_timeline(db, flt, days):
     for day, projects in tree.items():
         print(f"\n{B}── {day} ──{R}")
         for proj, ss in sorted(projects.items(), key=lambda kv: -kv[1][0]["t1"]):
-            print(f"  {B}{short(proj)}{R}  {D}{len(ss)} episodes, {sum(s['dn'] for s in ss)} prompts{R}")
+            print(f"  {B}{short(proj)}{R}  {D}{len(ss)} sessions, {sum(s['dn'] for s in ss)} prompts{R}")
             for s in ss:
                 br = f" [{s['branch']}]" if s["branch"] else ""
                 print(f"    {hhmm(s['t0'])}-{hhmm(s['t1'])}  {s['tool']:6} {one(s['title'] or s['first'], 70)}{D}{br}  {s['id'][:8]}{R}")
@@ -227,7 +225,7 @@ def cmd_projects(db, flt):
     for p in project_rows(db, flt):
         r = p["last"]
         print(f"{B}{hhmm(p['last_ts'], '%Y-%m-%d %H:%M')}  {short(p['project'])}{R}  "
-              f"{D}{p['ns']} episodes, {p['np']} prompts, {p['days']} days{R}")
+              f"{D}{p['ns']} sessions, {p['np']} prompts, {p['days']} days{R}")
         print(f"   last:  {one(r['title'] or r['first'], 80)}")
         print(f"   {D}{resume(r)}{R}")
 
@@ -252,7 +250,7 @@ def open_db():
 
 
 def api(path, query):
-    """JSON for the web UI (served by `punk-records serve` at /episodes)."""
+    """JSON for the web UI (served by `punk-records serve` at /sessions)."""
     from urllib.parse import parse_qs
     q = {k: v[0] for k, v in parse_qs(query).items()}
     db = open_db()

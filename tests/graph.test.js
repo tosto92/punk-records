@@ -25,15 +25,15 @@ test('html is self-contained and links each memory', () => {
   assert.match(html, /<title>a\n/);
 });
 
-test('previously graph writes graph.html in the repo store', () => {
+test('punk-records graph writes graph.html in the repo store', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-graph-'));
   const repo = path.join(dir, 'repo');
   fs.mkdirSync(path.join(repo, 'memory'), {recursive: true});
   execFileSync('git', ['init', '-q'], {cwd: repo});
   const home = path.join(dir, 'home');
   fs.mkdirSync(home, {recursive: true});
-  const run = (...args) => execFileSync(process.execPath, [path.resolve('bin/previously'), ...args], {
-    cwd: repo, encoding: 'utf8', env: {...process.env, PREVIOUSLY_HOME: path.join(home, 'missing')},
+  const run = (...args) => execFileSync(process.execPath, [path.resolve('bin/punk-records'), ...args], {
+    cwd: repo, encoding: 'utf8', env: {...process.env, PUNK_RECORDS_HOME: path.join(home, 'missing')},
   });
   run('save', '--type', 'note', '--title', 'alpha', '--tags', 'x', '--local');
   run('save', '--type', 'note', '--title', 'beta', '--tags', 'x', '--files', 'lib/a.js', '--local');
@@ -52,8 +52,8 @@ const tempRepo = (name) => {
 
 test('serveGraph answers on 127.0.0.1 with a fresh page per request', async () => {
   const repo = tempRepo('mem-serve-');
-  const env = {...process.env, PREVIOUSLY_HOME: path.join(repo, '..', 'global')};
-  const run = (...args) => execFileSync(process.execPath, [path.resolve('bin/previously'), ...args], {cwd: repo, encoding: 'utf8', env});
+  const env = {...process.env, PUNK_RECORDS_HOME: path.join(repo, '..', 'global')};
+  const run = (...args) => execFileSync(process.execPath, [path.resolve('bin/punk-records'), ...args], {cwd: repo, encoding: 'utf8', env});
   run('save', '--type', 'note', '--title', 'alpha', '--tags', 'x', '--local');
 
   const {serveGraph} = await import('../lib/graph.js');
@@ -116,22 +116,22 @@ test('the vendored viewer colours every memory type in all themes', () => {
 
 test('collectMemories can leave auto drafts out', () => {
   const repo = tempRepo('mem-drafts-');
-  const env = {...process.env, PREVIOUSLY_HOME: path.join(repo, '..', 'global')};
+  const env = {...process.env, PUNK_RECORDS_HOME: path.join(repo, '..', 'global')};
   for (const [title, tags] of [['kept', 'x'], ['Claude Code session s1', 'auto']]) {
-    execFileSync(process.execPath, [path.resolve('bin/previously'), 'save', '--type', 'note', '--title', title, '--tags', tags, '--local'], {cwd: repo, env});
+    execFileSync(process.execPath, [path.resolve('bin/punk-records'), 'save', '--type', 'note', '--title', title, '--tags', tags, '--local'], {cwd: repo, env});
   }
   const resolved = resolveScopes({explicit: 'local'}, repo);
   assert.deepEqual(collectMemories(resolved, 'local').map((m) => m.title).sort(), ['Claude Code session s1', 'kept']);
   assert.deepEqual(collectMemories(resolved, 'local', {drafts: false}).map((m) => m.title), ['kept']);
   const out = path.join(repo, 'g.html');
-  const cli = execFileSync(process.execPath, [path.resolve('bin/previously'), 'graph', '--local', '--no-drafts', '--out', out], {cwd: repo, env, encoding: 'utf8'});
+  const cli = execFileSync(process.execPath, [path.resolve('bin/punk-records'), 'graph', '--local', '--no-drafts', '--out', out], {cwd: repo, env, encoding: 'utf8'});
   assert.match(cli, /\(1 memories\)/);
 });
 
 test('interactive viewer is self-contained: serves its bundle and the memories api', async () => {
   const repo = tempRepo('mem-viewer-');
-  const env = {...process.env, PREVIOUSLY_HOME: path.join(repo, '..', 'global')};
-  execFileSync(process.execPath, [path.resolve('bin/previously'), 'save', '--type', 'solved', '--title', 'alpha', '--symptoms', 'boom', '--solution', 'fix', '--tags', 'x', '--files', 'a.js', '--local'], {cwd: repo, env});
+  const env = {...process.env, PUNK_RECORDS_HOME: path.join(repo, '..', 'global')};
+  execFileSync(process.execPath, [path.resolve('bin/punk-records'), 'save', '--type', 'solved', '--title', 'alpha', '--symptoms', 'boom', '--solution', 'fix', '--tags', 'x', '--files', 'a.js', '--local'], {cwd: repo, env});
   const {serveGraph} = await import('../lib/graph.js');
   const {resolveScopes} = await import('../lib/paths.js');
   const server = await serveGraph(resolveScopes({explicit: 'local'}, repo), {scope: 'local', port: 46_000 + (process.pid % 500), viewer: 'auto'});
@@ -145,7 +145,8 @@ test('interactive viewer is self-contained: serves its bundle and the memories a
     assert.match(graph.nodes[0].id, /^alpha/);
     assert.equal(graph.nodes[0].sources[0], 'a.js');
     assert.equal((await fetch(server.url + '/api/code-graph')).status, 404);
-    assert.match(await (await fetch(server.url + '/episodes')).text(), /<a href="\/episodes" aria-current="page">Episodes<\/a>/);
+    assert.equal((await fetch(server.url + '/episodes')).status, 404);
+    assert.match(await (await fetch(server.url + '/sessions')).text(), /<a href="\/sessions" aria-current="page">Sessions<\/a>/);
   } finally {
     await server.close();
   }

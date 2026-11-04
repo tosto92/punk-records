@@ -14,7 +14,7 @@ const empty = {valid: true, decisions: []};
 const realPython = process.env.PUNK_RECORDS_PYTHON;
 let fixtureDir;
 before(() => {
-  fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-review-interpreter-'));
+  fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-review-interpreter-'));
   const interpreter = path.join(fixtureDir, 'scanner');
   // Persistence tests isolate the validated bridge protocol; the integration below uses NOVA.
   fs.writeFileSync(interpreter, `#!/usr/bin/env node
@@ -41,17 +41,17 @@ after(() => {
   fs.rmSync(fixtureDir, {recursive: true, force: true});
 });
 function temp(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-review-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-review-'));
   t.after(() => fs.rmSync(dir, {recursive: true, force: true}));
   return dir;
 }
 function home(t) {
-  const before = process.env.PREVIOUSLY_HOME;
+  const before = process.env.PUNK_RECORDS_HOME;
   const dir = temp(t);
-  process.env.PREVIOUSLY_HOME = dir;
+  process.env.PUNK_RECORDS_HOME = dir;
   t.after(() => {
-    if (before === undefined) delete process.env.PREVIOUSLY_HOME;
-    else process.env.PREVIOUSLY_HOME = before;
+    if (before === undefined) delete process.env.PUNK_RECORDS_HOME;
+    else process.env.PUNK_RECORDS_HOME = before;
   });
   return path.join(dir, 'security', 'reviews.jsonl');
 }
@@ -189,11 +189,11 @@ test('changed_memory_or_rule_snapshot_before_append_rejected', t => {
   const copied = temp(t);
   fs.cpSync(path.join(root, 'lib'), path.join(copied, 'lib'), {recursive: true});
   fs.writeFileSync(path.join(copied, 'package.json'), '{"type":"module"}');
-  const rule = path.join(copied, 'lib/security/rules/previously.nov');
+  const rule = path.join(copied, 'lib/security/rules/punk-records.nov');
   fs.appendFileSync(rule, '\n# changed rules while reviewing\n');
   const manifestFile = path.join(copied, 'lib/security/rules/manifest.json');
   const manifest = JSON.parse(fs.readFileSync(manifestFile));
-  manifest.sha256['previously.nov'] = createHash('sha256').update(fs.readFileSync(rule)).digest('hex');
+  manifest.sha256['punk-records.nov'] = createHash('sha256').update(fs.readFileSync(rule)).digest('hex');
   fs.writeFileSync(manifestFile, JSON.stringify(manifest));
   const program = `import {recordDecision} from ${JSON.stringify(path.join(copied, 'lib/security/review.js'))};
     import {scanStore} from ${JSON.stringify(path.join(copied, 'lib/security/scan.js'))};
@@ -272,6 +272,13 @@ test('real NOVA evidence can be reviewed only after a fresh complete default sca
     assert.equal(result.status, 'suspicious');
     assert.deepEqual(result.incompleteRules, []);
     assert.equal(allowsMemory(result, readDecisions()), false);
+    assert.ok(result.matches.some(match => match.ruleName === 'PunkRecordsInstructionOverride'));
+    const legacy = {...row(result), ruleIds: ['PreviouslyInstructionOverride']};
+    assert.equal(reviewDecision(result, {valid: true, decisions: [legacy]}), null);
+    assert.equal(allowsMemory(result, {valid: true, decisions: [legacy]}), false);
+    const oldSnapshot = {...row(result), scanner: {...result.scanner, rulesHash: otherHash}};
+    assert.equal(reviewDecision(result, {valid: true, decisions: [oldSnapshot]}), null);
+    assert.equal(allowsMemory(result, {valid: true, decisions: [oldSnapshot]}), false);
     assert.deepEqual(recordDecision(entries[0], result, 'approve'), {recorded: true, reason: null});
     assert.equal(allowsMemory(result, readDecisions()), true);
     assert.equal(allowsMemory({...result, contentHash: otherHash}, readDecisions()), false);

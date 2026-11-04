@@ -13,11 +13,11 @@ import {securityFixture, writeSecurityStore, attack, benign} from './helpers/sec
 function repo(t) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "mem-recall-"));
   execFileSync("git", ["init", "-q"], { cwd });
-  const prev = process.env.PREVIOUSLY_HOME;
-  process.env.PREVIOUSLY_HOME = path.join(cwd, "global");
+  const prev = process.env.PUNK_RECORDS_HOME;
+  process.env.PUNK_RECORDS_HOME = path.join(cwd, "global");
   t.after(() => {
-    if (prev === undefined) delete process.env.PREVIOUSLY_HOME;
-    else process.env.PREVIOUSLY_HOME = prev;
+    if (prev === undefined) delete process.env.PUNK_RECORDS_HOME;
+    else process.env.PUNK_RECORDS_HOME = prev;
     fs.rmSync(cwd, { recursive: true, force: true });
   });
   return cwd;
@@ -147,7 +147,7 @@ test('automatic cards include outcome and bounded update metadata without splitt
 
 test('derived cards label and bound escaped source provenance', t => {
   const f = securityFixture(t);
-  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1', PREVIOUSLY_SYNTHESIS: '1'});
+  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1'});
   const file = path.join(f.root, 'native<&' + '🦓'.repeat(40) + '.md'); fs.writeFileSync(file, 'zebra native detail');
   writeSecurityStore(f.home, [{memoryId: 'c'.repeat(40), title: 'zebra original', solution: 'zebra original advice'}]);
   const options = {store: f.home, scope: 'global'};

@@ -11,15 +11,15 @@ import { collectMemories, contextGraph } from "../lib/graph.js";
 import { resolveScopes } from "../lib/paths.js";
 import { loadMemories } from "../lib/build.js";
 
-const BIN = path.resolve(import.meta.dirname, "..", "bin", "previously");
+const BIN = path.resolve(import.meta.dirname, "..", "bin", "punk-records");
 
 // Isolated global store + HOME; returns a factory for throwaway git repos.
 function sandbox(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "mem-projects-")));
-  const keys = ["HOME", "PREVIOUSLY_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME"];
+  const keys = ["HOME", "PUNK_RECORDS_HOME", "CLAUDE_CONFIG_DIR", "CODEX_HOME"];
   const prev = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
   process.env.HOME = path.join(root, "home");
-  process.env.PREVIOUSLY_HOME = path.join(root, "global");
+  process.env.PUNK_RECORDS_HOME = path.join(root, "global");
   delete process.env.CLAUDE_CONFIG_DIR;
   delete process.env.CODEX_HOME;
   t.after(() => {

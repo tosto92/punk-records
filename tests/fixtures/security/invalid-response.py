@@ -7,7 +7,7 @@ from runpy import run_path
 response = run_path(os.path.join(os.path.dirname(__file__), 'valid-response.py'))['response']
 result = response['results'][0]
 mode = os.environ['SECURITY_FIXTURE_MODE']
-match = {'ruleId': 'PreviouslyInstructionOverride', 'ruleName': 'PreviouslyInstructionOverride',
+match = {'ruleId': 'PunkRecordsInstructionOverride', 'ruleName': 'PunkRecordsInstructionOverride',
          'uuid': None, 'category': None, 'severity': None, 'field': 'solution', 'patternIds': ['$english']}
 if mode == 'duplicate_identity': response['results'][1] = result.copy()
 elif mode == 'missing_identity': response['results'].pop()

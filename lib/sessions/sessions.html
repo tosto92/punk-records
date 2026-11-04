@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Episodes — Punk Records</title>
+<title>Sessions — Punk Records</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2040%2044%22%3E%3Cpath%20d%3D%22M3%2022C4%2012%2011%202%2020%202s16%2010%2017%2020l-7-5-5%206-6-6-6%206-5-5Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22m4%2029%207%203%205-5%206%206%206-5%208%202c-2%209-8%2012-16%2012S6%2038%204%2029Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2226%22%20r%3D%224%22%20fill%3D%22%2365E1EB%22%2F%3E%3C%2Fsvg%3E">
 <style>
   /* Tokens shared with the memory viewer (lib/viewer/style.css). */
@@ -95,8 +95,8 @@
 </head>
 <body>
 <header>
-  <div class="brand"><a class="wordmark" href="/" id="home" title="Show all projects"><img class="brand-mark" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2040%2044%22%3E%3Cpath%20d%3D%22M3%2022C4%2012%2011%202%2020%202s16%2010%2017%2020l-7-5-5%206-6-6-6%206-5-5Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22m4%2029%207%203%205-5%206%206%206-5%208%202c-2%209-8%2012-16%2012S6%2038%204%2029Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2226%22%20r%3D%224%22%20fill%3D%22%2365E1EB%22%2F%3E%3C%2Fsvg%3E" alt="" width="32" height="36">Punk Records</a><nav class="switch" aria-label="Page"><a href="/">Memories</a><a href="/episodes" aria-current="page">Episodes</a><a href="/synthesis">Synthesis</a></nav></div>
-  <input id="q" type="search" placeholder="Filter by project, title, branch or prompt" aria-label="Filter episodes">
+  <div class="brand"><a class="wordmark" href="/" id="home" title="Show all projects"><img class="brand-mark" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2040%2044%22%3E%3Cpath%20d%3D%22M3%2022C4%2012%2011%202%2020%202s16%2010%2017%2020l-7-5-5%206-6-6-6%206-5-5Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22m4%2029%207%203%205-5%206%206%206-5%208%202c-2%209-8%2012-16%2012S6%2038%204%2029Z%22%20fill%3D%22%23F5A6C8%22%20stroke%3D%22%23102B46%22%20stroke-width%3D%222%22%20stroke-linejoin%3D%22round%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2226%22%20r%3D%224%22%20fill%3D%22%2365E1EB%22%2F%3E%3C%2Fsvg%3E" alt="" width="32" height="36">Punk Records</a><nav class="switch" aria-label="Page"><a href="/">Memories</a><a href="/sessions" aria-current="page">Sessions</a><a href="/synthesis">Synthesis</a></nav></div>
+  <input id="q" type="search" placeholder="Filter by project, title, branch or prompt" aria-label="Filter sessions">
   <select id="days" aria-label="Period">
     <option value="1">Today</option><option value="3">Last 3 days</option>
     <option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option><option value="365">Last year</option>
@@ -123,7 +123,7 @@ let sel = "";
 
 async function load() {
   const q = $("#q").value, days = $("#days").value;
-  try { localStorage.setItem("previously-episodes", JSON.stringify({days})); } catch {}
+  try { localStorage.setItem("punk-records-sessions", JSON.stringify({days})); } catch {}
   const d = await (await fetch(`/api/data?q=${encodeURIComponent(q)}&days=${days}`)).json();
   if (sel && !d.projects.some(p => p.project === sel)) sel = "";
 
@@ -135,7 +135,7 @@ async function load() {
     <button class="proj ${sel === p.project ? "on" : ""}" data-p="${esc(p.project)}" title="${esc(p.project)}">
       <b>${esc(home(p.project))}</b>
       <span class="muted">${esc(cut(p.last.title || p.last.first, 60))}</span>
-      <span class="muted">${when(p.last_ts)}, ${plural(p.ns, "episode")}</span>
+      <span class="muted">${when(p.last_ts)}, ${plural(p.ns, "session")}</span>
     </button>`).join("");
 
   const byDay = {};
@@ -144,7 +144,7 @@ async function load() {
     <h2 class="day">${t(new Date(day).getTime() / 1000 + 43200, {weekday: "long", day: "numeric", month: "long"})}</h2>
     ${Object.entries(projs).map(([p, ss]) => `
       <div class="pgroup">
-        <div class="ph">${esc(home(p))} <span class="muted">${plural(ss.length, "episode")}, ${plural(ss.reduce((a, s) => a + s.dn, 0), "prompt")}</span></div>
+        <div class="ph">${esc(home(p))} <span class="muted">${plural(ss.length, "session")}, ${plural(ss.reduce((a, s) => a + s.dn, 0), "prompt")}</span></div>
         ${ss.map(s => `
           <button class="sess" data-id="${esc(s.id)}">
             <span class="time">${hm(s.t0)}–${hm(s.t1)}</span>
@@ -153,7 +153,7 @@ async function load() {
             <span class="muted count">${plural(s.dn, "prompt")}</span>
           </button>`).join("")}
       </div>`).join("")}`).join("")
-    || `<p class="empty">No episodes in this period. Pick a longer period or clear the filter.</p>`;
+    || `<p class="empty">No sessions in this period. Pick a longer period or clear the filter.</p>`;
 }
 
 async function openSession(id) {
@@ -179,7 +179,16 @@ $("#tl").onclick = e => { const s = e.target.closest(".sess"); if (s) openSessio
 $("#dlg").onclick = e => { if (e.target === $("#dlg")) $("#dlg").close(); };
 let timer; $("#q").oninput = () => { clearTimeout(timer); timer = setTimeout(load, 250); };
 $("#days").onchange = load;
-try { const s = JSON.parse(localStorage.getItem("previously-episodes")); if (s) $("#days").value = s.days || 7; } catch {}
+// Import the known legacy preference once; a canonical value wins.
+try {
+  const oldKey = "previously-episodes", key = "punk-records-sessions";
+  const value = localStorage.getItem(oldKey);
+  if (value !== null) {
+    if (localStorage.getItem(key) === null) localStorage.setItem(key, value);
+    localStorage.removeItem(oldKey);
+  }
+} catch {}
+try { const s = JSON.parse(localStorage.getItem("punk-records-sessions")); if (s) $("#days").value = s.days || 7; } catch {}
 load();
 setInterval(() => document.hidden || $("#dlg").open || load(), 60000);
 </script>

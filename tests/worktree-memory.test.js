@@ -18,13 +18,13 @@ import {handleMessage} from '../lib/mcp.js';
 import {runScan} from '../lib/security/cli.js';
 
 const exec = promisify(execFile);
-const BIN = path.resolve(import.meta.dirname, '../bin/previously');
+const BIN = path.resolve(import.meta.dirname, '../bin/punk-records');
 
 function fixture(t) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'punk-worktrees-')));
   const values = {HOME: path.join(root, 'home'), PUNK_RECORDS_HOME: path.join(root, 'global'),
-    PREVIOUSLY_HOME: path.join(root, 'global'), PUNK_RECORDS_SECURITY: '0', PREVIOUSLY_SECURITY: '0',
-    PUNK_RECORDS_AUTOSAVE: '1', PREVIOUSLY_AUTOSAVE: '1', PUNK_RECORDS_SYNTHESIS: '0', PREVIOUSLY_SYNTHESIS: '0',
+    PUNK_RECORDS_HOME: path.join(root, 'global'), PUNK_RECORDS_SECURITY: '0',
+    PUNK_RECORDS_AUTOSAVE: '1', PUNK_RECORDS_SYNTHESIS: '0',
     CLAUDE_CONFIG_DIR: path.join(root, 'claude'), CODEX_HOME: path.join(root, 'codex'),
     GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1'};
   const previous = Object.fromEntries(Object.keys(values).map(k => [k, process.env[k]]));
@@ -148,7 +148,7 @@ test('build, graph, MCP freshness and synthesis CLI consume the shared store wit
 test('protected search and scan retain primary store identity across worktrees', t => {
   const {repo, external, store} = fixture(t);
   process.env.PUNK_RECORDS_SECURITY = '1';
-  process.env.PREVIOUSLY_SECURITY = '1';
+  process.env.PUNK_RECORDS_SECURITY = '1';
   const saved = saveMemory({type: 'solved', title: 'worktree benign restart', solution: 'restart safely'}, {cwd: external});
   assert.equal(saved.security.store, store);
   assert.equal(saved.security.status, 'no_signals');
@@ -301,7 +301,7 @@ test('empty synthesis adds no Git identity probes and preserves recall store att
   t.after(() => { if (previous === undefined) delete process.env.GIT_TRACE2_EVENT; else process.env.GIT_TRACE2_EVENT = previous; });
   const query = synthesis => {
     process.env.PUNK_RECORDS_SYNTHESIS = synthesis;
-    process.env.PREVIOUSLY_SYNTHESIS = synthesis;
+    process.env.PUNK_RECORDS_SYNTHESIS = synthesis;
     fs.writeFileSync(trace, '');
     const hits = search({query: 'shared recall evidence', resolved: {repoRoot: external}, full: true});
     const probes = fs.readFileSync(trace, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse)
@@ -320,7 +320,7 @@ test('empty synthesis adds no Git identity probes and preserves recall store att
 
 test('recall revalidates worktree identity on the next query', t => {
   const {root, repo, external, git} = fixture(t);
-  process.env.PUNK_RECORDS_SYNTHESIS = process.env.PREVIOUSLY_SYNTHESIS = '1';
+  process.env.PUNK_RECORDS_SYNTHESIS = '1';
   const saved = saveMemory({type: 'solved', title: 'identity recall evidence', solution: 'primary store'}, {cwd: repo});
   const options = {query: 'identity recall evidence', scope: 'local', resolved: {repoRoot: external}};
   assert.equal(search(options)[0]?.memoryId, saved.memoryId);

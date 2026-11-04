@@ -11,13 +11,13 @@ import {securityFixture} from './helpers/security.js';
 
 async function fixture(t, save = saveMemory) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-capture-'));
-  const home = process.env.PREVIOUSLY_HOME, enabled = process.env.PREVIOUSLY_AUTOSAVE;
-  process.env.PREVIOUSLY_HOME = cwd;
-  delete process.env.PREVIOUSLY_AUTOSAVE;
+  const home = process.env.PUNK_RECORDS_HOME, enabled = process.env.PUNK_RECORDS_AUTOSAVE;
+  process.env.PUNK_RECORDS_HOME = cwd;
+  delete process.env.PUNK_RECORDS_AUTOSAVE;
   const api = await import('../lib/capture.js').catch(() => ({}));
   const capture = api.createCapture?.({cwd, save, load: loadMemories});
-  t.after(() => {capture?.dispose(); if (home === undefined) delete process.env.PREVIOUSLY_HOME; else process.env.PREVIOUSLY_HOME = home;
-    if (enabled === undefined) delete process.env.PREVIOUSLY_AUTOSAVE; else process.env.PREVIOUSLY_AUTOSAVE = enabled;
+  t.after(() => {capture?.dispose(); if (home === undefined) delete process.env.PUNK_RECORDS_HOME; else process.env.PUNK_RECORDS_HOME = home;
+    if (enabled === undefined) delete process.env.PUNK_RECORDS_AUTOSAVE; else process.env.PUNK_RECORDS_AUTOSAVE = enabled;
     fs.rmSync(cwd, {recursive: true, force: true});});
   return {cwd, capture, api, memories: () => loadMemories(cwd).memories};
 }
@@ -115,8 +115,8 @@ test('50 edits trigger a batch and draft files are capped at 20 without losing p
 
 test('disabled capture and deleted or disposed sessions never save', async t => {
   const {capture, memories} = await fixture(t);
-  process.env.PREVIOUSLY_AUTOSAVE = '0'; capture.edit('A', ['a.js']); await capture.idle('A');
-  delete process.env.PREVIOUSLY_AUTOSAVE;
+  process.env.PUNK_RECORDS_AUTOSAVE = '0'; capture.edit('A', ['a.js']); await capture.idle('A');
+  delete process.env.PUNK_RECORDS_AUTOSAVE;
   capture.edit('B', ['b.js']); capture.forget('B'); await capture.idle('B');
   capture.edit('C', ['c.js']); capture.dispose(); await capture.idle('C');
   assert.deepEqual(memories(), []);
@@ -132,10 +132,10 @@ test('logging failure after append does not retry a successful save', async t =>
 test('autoMemoryId returns the auto draft by title and ignores curated memories', t => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-autoid-'));
   execFileSync('git', ['init', '-q'], {cwd});
-  const home = process.env.PREVIOUSLY_HOME;
-  process.env.PREVIOUSLY_HOME = path.join(cwd, 'global');
+  const home = process.env.PUNK_RECORDS_HOME;
+  process.env.PUNK_RECORDS_HOME = path.join(cwd, 'global');
   t.after(() => {
-    if (home === undefined) delete process.env.PREVIOUSLY_HOME; else process.env.PREVIOUSLY_HOME = home;
+    if (home === undefined) delete process.env.PUNK_RECORDS_HOME; else process.env.PUNK_RECORDS_HOME = home;
     fs.rmSync(cwd, {recursive: true, force: true});
   });
   assert.equal(autoMemoryId(cwd, 'Codex session s1'), null);

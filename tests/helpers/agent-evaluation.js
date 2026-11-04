@@ -10,13 +10,13 @@ import assert from 'node:assert/strict';
 export const CASES = ['apply', 'discovered', 'tail', 'save-fix', 'save-decision', 'repeat', 'trivial', 'ack', 'no-save', 'malicious', 'resume'];
 export const INSTALLATIONS = ['standalone-project', 'standalone-global', 'plugin'];
 const TOOLS = ['memory_find', 'memory_save', 'memory_freshness'];
-const NOVA = '/home/itc34/.local/share/previously-nova-venv/bin/python';
+const NOVA = process.env.PUNK_RECORDS_PYTHON || 'python3';
 const LIVE_OFF = 'compact and clear live delivery/behavior unverified; no safe headless transport established';
 const hash = text => createHash('sha256').update(text).digest('hex');
 const readJSONL = file => fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(JSON.parse) : [];
 const inside = (root, file) => file === root || file.startsWith(root + path.sep);
 
-const taskMetadata = name => ['.git', '.claude', 'memory', '.mcp.json', '.punk-records', '.previously'].includes(name);
+const taskMetadata = name => ['.git', '.claude', 'memory', '.mcp.json', '.punk-records'].includes(name);
 
 function physicalPath(file) {
   let current = path.resolve(file);
@@ -160,7 +160,7 @@ export function createFixture({root, installation, caseId, attempt}) {
   try {
     for (const dir of ['repo', 'bin', 'home', 'config', 'store', 'tmp', 'xdg-config', 'xdg-data', 'cache']) fs.mkdirSync(path.join(base, dir));
     execFileSync('git', ['init', '-q'], {cwd: fixture.cwd, env: fixture.env});
-    for (const alias of ['punk-records', 'previously']) fs.symlinkSync(path.join(root, 'bin', alias), path.join(base, 'bin', alias));
+    for (const alias of ['punk-records']) fs.symlinkSync(path.join(root, 'bin', alias), path.join(base, 'bin', alias));
     fixture.validator = path.join(base, 'validate.cjs');
     fixture.observations = path.join(base, 'hooks.jsonl');
     // Observe the actual revision's hook command without adding/replacing installed hooks.
@@ -295,7 +295,7 @@ export function verifyFixture(fixture) {
     assert.equal(JSON.parse(response).hookSpecificOutput.permissionDecision, expected, 'trusted native guard preflight');
   }
   assert.equal(fs.realpathSync(root), root, 'revision root must be a realpath');
-  for (const alias of ['punk-records', 'previously']) {
+  for (const alias of ['punk-records']) {
     const expected = fs.realpathSync(path.join(root, 'bin', alias));
     assert.ok(inside(root, expected), 'alias escapes selected root');
     assert.equal(fs.realpathSync(path.join(base, 'bin', alias)), expected, 'wrong revision alias');
@@ -322,7 +322,7 @@ export function verifyFixture(fixture) {
       ? path.join(fixture.cwd, '.claude', 'settings.json') : path.join(env.CLAUDE_CONFIG_DIR, 'settings.json');
     const hooks = JSON.parse(fs.readFileSync(settings)).hooks;
     for (const groups of Object.values(hooks)) for (const group of groups) for (const hook of group.hooks) {
-      assert.match(hook.command, /^(previously|punk-records) hook claude \w+$/);
+      assert.match(hook.command, /^punk-records hook claude \w+$/);
     }
   }
   const messages = [
@@ -333,13 +333,13 @@ export function verifyFixture(fixture) {
     cwd: fixture.cwd, env, input: messages.map(m => JSON.stringify(m)).join('\n') + '\n', encoding: 'utf8', timeout: 30000});
   const advertised = out.trim().split('\n').map(JSON.parse).find(m => m.id === 2)?.result?.tools?.map(tool => tool.name);
   assert.deepEqual(advertised, TOOLS, 'MCP must advertise exactly the actual three tools');
-  return {resolver, aliases: ['punk-records', 'previously'].map(alias => fs.realpathSync(path.join(base, 'bin', alias))),
+  return {resolver, aliases: ['punk-records'].map(alias => fs.realpathSync(path.join(base, 'bin', alias))),
     mcp: {namespace: fixture.namespace, advertised}, environment: {HOME: env.HOME, config: env.CLAUDE_CONFIG_DIR, store: env.PUNK_RECORDS_HOME}};
 }
 
 export function permissions(fixture) {
   return ['Read', 'Glob', 'Grep', 'Edit', 'Write', `Bash(node ${fixture.validator})`,
-    ...['punk-records', 'previously'].flatMap(alias => ['ask', 'save'].flatMap(command => [
+    ...['punk-records'].flatMap(alias => ['ask', 'save'].flatMap(command => [
       `Bash(${alias} ${command} *)`, `Bash(node ${fixture.root}/bin/${alias} ${command} *)`])),
     ...TOOLS.map(tool => `mcp__${fixture.namespace}__${tool}`)];
 }
@@ -506,7 +506,7 @@ function memoryCommand(fixture, words) {
   if (!words) return null;
   const entry = words[0] === 'node' ? words[1] : words[0];
   const operation = words[words[0] === 'node' ? 2 : 1];
-  const entries = ['punk-records', 'previously'].map(alias => words[0] === 'node' ? path.join(fixture.root, 'bin', alias) : alias);
+  const entries = ['punk-records'].map(alias => words[0] === 'node' ? path.join(fixture.root, 'bin', alias) : alias);
   return entries.includes(entry) && ['ask', 'save'].includes(operation) ? operation : null;
 }
 

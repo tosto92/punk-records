@@ -5,22 +5,22 @@ import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
 
-test("Punk Records skills and save command have canonical names alongside legacy aliases", () => {
-  for (const name of ["punk-records", "punk-records-episodes"]) {
+test("Punk Records skills and save command have canonical names without legacy aliases", () => {
+  for (const name of ["punk-records", "punk-records-sessions"]) {
     const src = fs.readFileSync(path.join(root, "skills", name, "SKILL.md"), "utf8");
     assert.match(src, new RegExp(`^---\\nname: ${name}\\n`));
-    assert.match(src, /punk-records (ask|episodes)/);
+    assert.match(src, /punk-records (ask|sessions)/);
   }
   assert.match(fs.readFileSync(path.join(root, "commands", "punk-records-save.md"), "utf8"), /punk-records save/);
-  assert.ok(fs.existsSync(path.join(root, "skills", "previously", "SKILL.md")));
-  assert.ok(fs.existsSync(path.join(root, "commands", "previously-save.md")));
+  assert.ok(fs.existsSync(path.join(root, "skills", "punk-records", "SKILL.md")));
+  assert.ok(fs.existsSync(path.join(root, "commands", "punk-records-save.md")));
 });
 
-test("previously skill teaches when to save and recall", () => {
-  const p = path.join(root, "skills", "previously", "SKILL.md");
+test("punk-records skill teaches when to save and recall", () => {
+  const p = path.join(root, "skills", "punk-records", "SKILL.md");
   assert.ok(fs.existsSync(p), "SKILL.md must exist");
   const src = fs.readFileSync(p, "utf8");
-  assert.match(src, /^---\nname: previously\n/, "frontmatter name");
+  assert.match(src, /^---\nname: punk-records\n/, "frontmatter name");
   assert.match(src, /description: .{20,}/, "frontmatter description drives triggering");
   for (const trigger of ["bug", "decision", "workaround", "preference"]) {
     assert.ok(src.toLowerCase().includes(trigger), `must mention save trigger: ${trigger}`);
@@ -41,13 +41,13 @@ test("previously skill teaches when to save and recall", () => {
   assert.ok(draftSection.includes("--ref claude-code-session-"), "Drafts example must use slug ref format");
   assert.ok(!/--ref "[A-Z]/.test(src), "SKILL.md example must not quote the ref with capitals");
 
-  const command = fs.readFileSync(path.join(root, "commands", "previously-save.md"), "utf8");
-  assert.ok(command.includes("-session-<id>") && command.includes("--ref"), "previously-save must document slug ref format");
-  assert.ok(!/--ref "[A-Z]/.test(command), "previously-save example must not quote ref with capital letter");
+  const command = fs.readFileSync(path.join(root, "commands", "punk-records-save.md"), "utf8");
+  assert.ok(command.includes("-session-<id>") && command.includes("--ref"), "punk-records-save must document slug ref format");
+  assert.ok(!/--ref "[A-Z]/.test(command), "punk-records-save example must not quote ref with capital letter");
 });
 
-test("previously skill supplies the protected memory review workflow", () => {
-  const src = fs.readFileSync(path.join(root, "skills", "previously", "SKILL.md"), "utf8");
+test("punk-records skill supplies the protected memory review workflow", () => {
+  const src = fs.readFileSync(path.join(root, "skills", "punk-records", "SKILL.md"), "utf8");
   for (const reference of ["PUNK_RECORDS_SECURITY=1", "PUNK_RECORDS_PYTHON", "punk-records scan", "punk-records review",
     "no_signals", "suspicious", "incomplete", "pending", "false positive", "revoke", "docs/memory-security.md"]) {
     assert.ok(src.includes(reference), `must document security reference: ${reference}`);
@@ -60,7 +60,7 @@ test("previously skill supplies the protected memory review workflow", () => {
   assert.match(src, /unconfigured installs are unprotected/i);
 });
 
-for (const name of ['punk-records', 'previously']) {
+for (const name of ['punk-records']) {
   test(`${name} starts with concise recall/save procedure and teaches full retrieval`, () => {
     const src = fs.readFileSync(path.join(root, 'skills', name, 'SKILL.md'), 'utf8');
     assert.ok(src.indexOf('## Workflow') < src.indexOf('## Recall'));
@@ -77,7 +77,8 @@ for (const name of ['punk-records', 'previously']) {
   });
 }
 
-test('canonical and compatibility skills keep identical workflow bodies', () => {
-  const body = name => fs.readFileSync(path.join(root, 'skills', name, 'SKILL.md'), 'utf8').split('# Punk Records')[1];
-  assert.equal(body('punk-records'), body('previously'));
+test('only explicit brainbrain compatibility skills remain', () => {
+  for (const name of ['previously', 'previously-episodes']) assert.equal(fs.existsSync(path.join(root, 'skills', name)), false);
+  assert.equal(fs.existsSync(path.join(root, 'commands', 'previously-save.md')), false);
+  for (const name of ['brainbrain', 'brainbrain-synthesize']) assert.ok(fs.existsSync(path.join(root, 'skills', name, 'SKILL.md')));
 });

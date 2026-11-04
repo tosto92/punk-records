@@ -30,22 +30,22 @@ async function run(binary, args, {cwd, env}, timeout = 300000) {
   } finally {clearTimeout(deadline);}
 }
 
-// Temp git repo, `previously` on PATH via a temp bin dir, isolated global store and HOME.
+// Temp git repo, `punk-records` on PATH via a temp bin dir, isolated global store and HOME.
 function project(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-agent-smoke-'));
   const cwd = path.join(root, 'repo'), bin = path.join(root, 'bin');
   fs.mkdirSync(cwd); fs.mkdirSync(bin);
-  fs.symlinkSync(BIN, path.join(bin, 'previously'));
+  fs.symlinkSync(BIN, path.join(bin, 'punk-records'));
   execFileSync('git', ['init', '-q'], {cwd});
   saveMemory({type: 'solved', title: 'Zebra quartz deploy codeword', symptoms: 'deploy codeword zebra quartz',
     solution: 'The deploy codeword is PLATYPUS-42'}, {cwd});
-  const env = {...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, PREVIOUSLY_HOME: path.join(root, 'store')};
-  delete env.PREVIOUSLY_AUTOSAVE;
+  const env = {...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, PUNK_RECORDS_HOME: path.join(root, 'store')};
+  delete env.PUNK_RECORDS_AUTOSAVE;
   t.after(() => fs.rmSync(root, {recursive: true, force: true}));
   return {root, cwd, env};
 }
 
-// initRepo reads HOME / CODEX_HOME / PREVIOUSLY_HOME from process.env.
+// initRepo reads HOME / CODEX_HOME / PUNK_RECORDS_HOME from process.env.
 function withEnv(vars, fn) {
   const prev = Object.fromEntries(Object.keys(vars).map(k => [k, process.env[k]]));
   Object.assign(process.env, vars);
@@ -70,7 +70,7 @@ test('Claude Code: repo hooks recall the seeded memory and save a draft for hell
     env.CLAUDE_CONFIG_DIR = path.join(root, 'claude-config');
     fs.mkdirSync(env.CLAUDE_CONFIG_DIR);
     fs.copyFileSync(path.join(os.homedir(), '.claude', '.credentials.json'), path.join(env.CLAUDE_CONFIG_DIR, '.credentials.json'));
-    withEnv({HOME: path.join(root, 'home'), PATH: env.PATH, PREVIOUSLY_HOME: env.PREVIOUSLY_HOME}, () => initRepo({cwd, explicit: 'local', agents: ['claude']}));
+    withEnv({HOME: path.join(root, 'home'), PATH: env.PATH, PUNK_RECORDS_HOME: env.PUNK_RECORDS_HOME}, () => initRepo({cwd, explicit: 'local', agents: ['claude']}));
     const out = await run(process.env.CLAUDE_BIN, ['-p', PROMPT, '--permission-mode', 'acceptEdits', '--strict-mcp-config'], {cwd, env});
     t.diagnostic(out.slice(-400));
     assert.ok(transcriptsContain(path.join(env.CLAUDE_CONFIG_DIR, 'projects'), 'PLATYPUS-42'), 'recalled memory must reach the transcript');
@@ -104,7 +104,7 @@ test('Codex: hooks recall the seeded memory and save a draft for hello.txt',
     fs.mkdirSync(env.CODEX_HOME);
     fs.copyFileSync(path.join(os.homedir(), '.codex', 'auth.json'), path.join(env.CODEX_HOME, 'auth.json'));
     fs.writeFileSync(path.join(env.CODEX_HOME, 'config.toml'), `[projects.${JSON.stringify(cwd)}]\ntrust_level = "trusted"\n`);
-    withEnv({HOME: path.join(root, 'home'), PATH: env.PATH, CODEX_HOME: env.CODEX_HOME, PREVIOUSLY_HOME: env.PREVIOUSLY_HOME},
+    withEnv({HOME: path.join(root, 'home'), PATH: env.PATH, CODEX_HOME: env.CODEX_HOME, PUNK_RECORDS_HOME: env.PUNK_RECORDS_HOME},
       () => initRepo({cwd, explicit: CODEX_PROJECT_HOOKS ? 'local' : 'global', agents: ['codex']}));
     const out = await run(process.env.CODEX_BIN, ['exec', '--sandbox', 'workspace-write', '--dangerously-bypass-hook-trust', PROMPT], {cwd, env});
     t.diagnostic(out.slice(-400));

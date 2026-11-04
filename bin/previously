@@ -1,3 +1,0 @@
-#!/usr/bin/env node
-// Compatibility entrypoint for existing installs.
-import './punk-records';

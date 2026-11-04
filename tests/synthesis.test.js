@@ -12,7 +12,7 @@ import {handleMessage} from '../lib/mcp.js';
 
 function fixture(t) {
   const f = securityFixture(t);
-  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1', PREVIOUSLY_SYNTHESIS: '1'});
+  Object.assign(process.env, {PUNK_RECORDS_SYNTHESIS: '1'});
   writeSecurityStore(f.home, [benign]);
   const file = path.join(f.root, 'native.md'); fs.writeFileSync(file, 'deploy native detail');
   return {...f, file, store: f.home, scope: 'global'};

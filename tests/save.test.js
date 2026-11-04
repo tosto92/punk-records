@@ -12,10 +12,10 @@ import {recallBlock} from '../lib/recall.js';
 import {prepareSynthesis} from '../lib/synthesis.js';
 
 async function setup(t) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-save-'));
-  const previous = process.env.PREVIOUSLY_HOME;
-  process.env.PREVIOUSLY_HOME = dir;
-  t.after(() => { if (previous === undefined) delete process.env.PREVIOUSLY_HOME; else process.env.PREVIOUSLY_HOME = previous; fs.rmSync(dir, {recursive: true, force: true}); });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-save-'));
+  const previous = process.env.PUNK_RECORDS_HOME;
+  process.env.PUNK_RECORDS_HOME = dir;
+  t.after(() => { if (previous === undefined) delete process.env.PUNK_RECORDS_HOME; else process.env.PUNK_RECORDS_HOME = previous; fs.rmSync(dir, {recursive: true, force: true}); });
   const api = await import('../lib/save.js').catch(() => ({}));
   return {dir, save: api.saveMemory, options: {cwd: dir, scope: 'global'}, resolved: {repoRoot: null}};
 }
@@ -84,10 +84,10 @@ test('legacy outcomes stay persisted and partial tail is reread', async t => {
 
 test('concurrent CLI writers keep every complete event searchable', async t => {
   const {dir, resolved} = await setup(t);
-  const cli = path.resolve(import.meta.dirname, '../bin/previously');
+  const cli = path.resolve(import.meta.dirname, '../bin/punk-records');
   await Promise.all(Array.from({length: 8}, (_, i) => new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cli, 'save', '--global', '--type', 'note', '--title', `writer token ${i}`],
-      {env: {...process.env, PREVIOUSLY_HOME: dir}, stdio: 'ignore'});
+      {env: {...process.env, PUNK_RECORDS_HOME: dir}, stdio: 'ignore'});
     child.on('error', reject); child.on('exit', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`)));
   })));
   assert.equal(fs.readFileSync(path.join(dir, 'events.jsonl'), 'utf8').trim().split('\n').length, 8);

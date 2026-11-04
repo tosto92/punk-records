@@ -9,7 +9,7 @@ import {writeSecurityStore, benign, attack} from './helpers/security.js';
 const checkout = path.resolve(import.meta.dirname, '..');
 
 test('actual npm artifact scans benign and suspicious memories outside the checkout', t => {
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'previously-package-'));
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-records-package-'));
   t.after(() => fs.rmSync(temp, {recursive: true, force: true}));
   const unpacked = path.join(temp, 'unpacked package with spaces');
   const cwd = path.join(temp, 'outside checkout');
@@ -22,17 +22,17 @@ test('actual npm artifact scans benign and suspicious memories outside the check
   assert.equal(packed.status, 0, String(packed.error || packed.stderr));
   const [artifact] = JSON.parse(packed.stdout);
   const files = new Set(artifact.files.map(file => file.path));
-  for (const file of ['bin/previously', 'lib/security/scan.py', 'lib/security/scan.js',
-    'lib/security/requirements.txt', 'lib/security/rules/manifest.json', 'lib/security/rules/previously.nov',
+  for (const file of ['bin/punk-records', 'lib/security/scan.py', 'lib/security/scan.js',
+    'lib/security/requirements.txt', 'lib/security/rules/manifest.json', 'lib/security/rules/punk-records.nov',
     'lib/security/rules/upstream/claude_magic_string.nov', 'lib/security/rules/upstream/delimiter_termination_probe.nov',
     'lib/security/rules/upstream/hidden_unicode.nov', 'lib/security/rules/upstream/LICENSE']) {
     assert.ok(files.has(file), `missing published asset: ${file}`);
   }
   const extracted = spawnSync('tar', ['-xzf', path.join(temp, artifact.filename), '-C', unpacked], {encoding: 'utf8'});
   assert.equal(extracted.status, 0, String(extracted.error || extracted.stderr));
-  const cli = path.join(unpacked, 'package', 'bin', 'previously');
+  const cli = path.join(unpacked, 'package', 'bin', 'punk-records');
   assert.ok(fs.lstatSync(cli).isFile(), 'CLI is an extracted file, not a checkout link');
-  const env = {...process.env, PREVIOUSLY_HOME: store, PUNK_RECORDS_PYTHON: process.env.PUNK_RECORDS_PYTHON || 'python3'};
+  const env = {...process.env, PUNK_RECORDS_HOME: store, PUNK_RECORDS_PYTHON: process.env.PUNK_RECORDS_PYTHON || 'python3'};
   env.PUNK_RECORDS_SECURITY = '0';
   for (const [memory, expectedCode, expectedStatus] of [[benign, 0, 'no_signals'], [attack, 1, 'suspicious']]) {
     writeSecurityStore(store, [memory]);
@@ -47,7 +47,7 @@ test('actual npm artifact scans benign and suspicious memories outside the check
     assert.deepEqual(report.results[0].reasonCodes, []);
     assert.equal(report.scanner.engineVersion, '0.3.1');
     assert.match(report.scanner.rulesHash, /^[a-f0-9]{64}$/);
-    if (expectedStatus === 'suspicious') assert.ok(report.results[0].matches.some(match => match.ruleName === 'PreviouslyInstructionOverride'));
+    if (expectedStatus === 'suspicious') assert.ok(report.results[0].matches.some(match => match.ruleName === 'PunkRecordsInstructionOverride'));
   }
 });
 
@@ -58,7 +58,7 @@ test('npm artifact excludes Python caches even after local execution', t => {
   const source = path.join(temp, 'source'); fs.mkdirSync(source);
   fs.copyFileSync(path.join(checkout, 'package.json'), path.join(source, 'package.json'));
   fs.cpSync(path.join(checkout, 'lib'), path.join(source, 'lib'), {recursive: true});
-  for (const relative of ['security/__pycache__/scan.cpython-312.pyc', 'episodes/__pycache__/sessions.cpython-310.pyc', 'security/scan.pyc', 'episodes/sessions.pyo']) {
+  for (const relative of ['security/__pycache__/scan.cpython-312.pyc', 'sessions/__pycache__/sessions.cpython-310.pyc', 'security/scan.pyc', 'sessions/sessions.pyo']) {
     const file = path.join(source, 'lib', relative);
     fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, 'synthetic bytecode');
   }
@@ -66,5 +66,5 @@ test('npm artifact excludes Python caches even after local execution', t => {
   assert.equal(packed.status, 0, String(packed.error || packed.stderr));
   const files = JSON.parse(packed.stdout)[0].files.map(f => f.path);
   assert.deepEqual(files.filter(f => f.includes('__pycache__/') || /\.py[co]$/.test(f)), []);
-  for (const file of ['lib/security/scan.py', 'lib/episodes/sessions.py', 'lib/security/rules/manifest.json']) assert.ok(files.includes(file), file);
+  for (const file of ['lib/security/scan.py', 'lib/sessions/sessions.py', 'lib/security/rules/manifest.json']) assert.ok(files.includes(file), file);
 });

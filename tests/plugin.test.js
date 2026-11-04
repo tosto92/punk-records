@@ -16,13 +16,13 @@ const TS = {skip: !process.features?.typescript && 'this Node cannot import .ts 
 async function fixture(t) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'mem-plugin-'));
   execFileSync('git', ['init', '-q'], {cwd});
-  const enabled = process.env.PREVIOUSLY_AUTOSAVE, home = process.env.PREVIOUSLY_HOME;
-  delete process.env.PREVIOUSLY_AUTOSAVE;
+  const enabled = process.env.PUNK_RECORDS_AUTOSAVE, home = process.env.PUNK_RECORDS_HOME;
+  delete process.env.PUNK_RECORDS_AUTOSAVE;
   // Recall also searches the global store; keep real user memories out of the fixture.
-  process.env.PREVIOUSLY_HOME = path.join(cwd, 'global');
-  t.after(() => {if (enabled === undefined) delete process.env.PREVIOUSLY_AUTOSAVE; else process.env.PREVIOUSLY_AUTOSAVE = enabled;
-    if (home === undefined) delete process.env.PREVIOUSLY_HOME; else process.env.PREVIOUSLY_HOME = home; fs.rmSync(cwd, {recursive: true, force: true});});
-  const module = await import('../.opencode/plugins/previously.ts').catch(() => ({}));
+  process.env.PUNK_RECORDS_HOME = path.join(cwd, 'global');
+  t.after(() => {if (enabled === undefined) delete process.env.PUNK_RECORDS_AUTOSAVE; else process.env.PUNK_RECORDS_AUTOSAVE = enabled;
+    if (home === undefined) delete process.env.PUNK_RECORDS_HOME; else process.env.PUNK_RECORDS_HOME = home; fs.rmSync(cwd, {recursive: true, force: true});});
+  const module = await import('../.opencode/plugins/punk-records.ts').catch(() => ({}));
   return {cwd, module, plugin: module.default, memories: () => loadMemories(path.join(cwd, 'memory')).memories};
 }
 const afterV1 = (hooks, sid, file, tool = 'write') => hooks['tool.execute.after'](
@@ -137,7 +137,7 @@ test('V2 rejects failed tools and foreign sessions; deletion cancels pending wai
 });
 
 test('autosave kill switch applies to V1 and V2', TS, async t => {
-  const {cwd, plugin, memories} = await fixture(t); process.env.PREVIOUSLY_AUTOSAVE = '0';
+  const {cwd, plugin, memories} = await fixture(t); process.env.PUNK_RECORDS_AUTOSAVE = '0';
   const v1 = await plugin.server({directory: cwd}); await afterV1(v1, 'A', path.join(cwd, 'a.js')); await idleV1(v1, 'A');
   const {ctx, hooks, waits} = context(cwd); const cleanup = await plugin.setup(ctx); t.after(cleanup);
   await hooks['execute.after'](afterV2('B', path.join(cwd, 'b.js')));
@@ -147,7 +147,7 @@ test('autosave kill switch applies to V1 and V2', TS, async t => {
 test('both OpenCode wrappers exclude quarantined payloads and continue on scanner failure', TS, async t => {
   const f = securityFixture(t);
   writeSecurityStore(path.join(f.repo, 'memory'), [attack, benign], 'repo');
-  const {default: plugin} = await import('../.opencode/plugins/previously.ts');
+  const {default: plugin} = await import('../.opencode/plugins/punk-records.ts');
   const logs = []; t.mock.method(console, 'error', line => logs.push(line));
   const v1 = await plugin.server({directory: f.repo});
   await v1['chat.message']({sessionID: 'A'}, {parts: [{type: 'text', text: 'deploy'}]});

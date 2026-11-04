@@ -16,7 +16,7 @@ delete process.env.CODEX_HOME;
 test.after(() => fs.rmSync(SANDBOX_HOME, { recursive: true, force: true }));
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PLUGIN_FILE = path.join(ROOT, ".opencode", "plugins", "previously.ts");
+const PLUGIN_FILE = path.join(ROOT, ".opencode", "plugins", "punk-records.ts");
 const BIN = path.join(ROOT, "bin", "punk-records");
 
 // A fresh git repo plus fully isolated global scope; nothing leaks to the real home.
@@ -24,8 +24,8 @@ function fixture(t, env = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mem-init-"));
   execFileSync("git", ["init", "-q"], { cwd: tmp });
   const prev = {};
-  const set = { PREVIOUSLY_HOME: path.join(tmp, "home"), PREVIOUSLY_CONFIG: path.join(tmp, "global.json"),
-    PREVIOUSLY_PLUGINS: path.join(tmp, "plugins"), PREVIOUSLY_SKILLS: path.join(tmp, "skills"), ...env };
+  const set = { PUNK_RECORDS_HOME: path.join(tmp, "home"), PUNK_RECORDS_CONFIG: path.join(tmp, "global.json"),
+    PUNK_RECORDS_PLUGINS: path.join(tmp, "plugins"), PUNK_RECORDS_SKILLS: path.join(tmp, "skills"), ...env };
   for (const [k, v] of Object.entries(set)) {
     prev[k] = process.env[k];
     if (v === undefined) delete process.env[k];
@@ -74,8 +74,8 @@ test("init creates markers and second run is byte-identical", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mem-init-"));
   execFileSync("git", ["init"], { cwd: tmp, stdio: "ignore" });
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "mem-home-"));
-  const prevHome = process.env.PREVIOUSLY_HOME;
-  process.env.PREVIOUSLY_HOME = home;
+  const prevHome = process.env.PUNK_RECORDS_HOME;
+  process.env.PUNK_RECORDS_HOME = home;
   try {
   fs.writeFileSync(
     path.join(tmp, "AGENTS.md"),
@@ -125,7 +125,7 @@ test("init creates markers and second run is byte-identical", () => {
   const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "mem-init-local-"));
   execFileSync("git", ["init"], { cwd: tmp2, stdio: "ignore" });
   const home2 = fs.mkdtempSync(path.join(os.tmpdir(), "mem-home2-"));
-  process.env.PREVIOUSLY_HOME = home2;
+  process.env.PUNK_RECORDS_HOME = home2;
   initRepo({ cwd: tmp2, explicit: "local" });
   assert.equal(fs.existsSync(path.join(tmp2, "memory", "events.jsonl")), true);
   assert.equal(fs.existsSync(path.join(home2, "events.jsonl")), false);
@@ -133,8 +133,8 @@ test("init creates markers and second run is byte-identical", () => {
   assert.equal(real("AGENTS.md"), realAgents);
   assert.equal(real("opencode.json"), realOpencode);
   } finally {
-    if (prevHome === undefined) delete process.env.PREVIOUSLY_HOME;
-    else process.env.PREVIOUSLY_HOME = prevHome;
+    if (prevHome === undefined) delete process.env.PUNK_RECORDS_HOME;
+    else process.env.PUNK_RECORDS_HOME = prevHome;
   }
 });
 
@@ -142,8 +142,8 @@ test("invalid opencode.json aborts init instead of being replaced", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mem-init-bad-"));
   execFileSync("git", ["init"], { cwd: tmp, stdio: "ignore" });
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "mem-home-bad-"));
-  const prevHome = process.env.PREVIOUSLY_HOME;
-  process.env.PREVIOUSLY_HOME = home;
+  const prevHome = process.env.PUNK_RECORDS_HOME;
+  process.env.PUNK_RECORDS_HOME = home;
   try {
   const bad = "{ not valid json !!!";
   fs.writeFileSync(path.join(tmp, "opencode.json"), bad);
@@ -154,37 +154,37 @@ test("invalid opencode.json aborts init instead of being replaced", () => {
   assert.deepEqual(fs.readdirSync(tmp).sort(), [".git", "opencode.json"]);
   assert.equal(fs.readdirSync(home).length, 0);
   } finally {
-    if (prevHome === undefined) delete process.env.PREVIOUSLY_HOME;
-    else process.env.PREVIOUSLY_HOME = prevHome;
+    if (prevHome === undefined) delete process.env.PUNK_RECORDS_HOME;
+    else process.env.PUNK_RECORDS_HOME = prevHome;
   }
 });
 
 test("global init wires plugin symlink and global MCP config", () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mem-init-global-"));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "mem-home-global-"));
-  const prevHome = process.env.PREVIOUSLY_HOME;
-  const prevConfig = process.env.PREVIOUSLY_CONFIG;
-  const prevPlugins = process.env.PREVIOUSLY_PLUGINS;
-  const prevSkills = process.env.PREVIOUSLY_SKILLS;
+  const prevHome = process.env.PUNK_RECORDS_HOME;
+  const prevConfig = process.env.PUNK_RECORDS_CONFIG;
+  const prevPlugins = process.env.PUNK_RECORDS_PLUGINS;
+  const prevSkills = process.env.PUNK_RECORDS_SKILLS;
   const fakeConfig = path.join(tmp, "global-opencode.json");
   const fakePlugins = path.join(tmp, "plugins");
   const fakeSkills = path.join(tmp, "skills");
-  process.env.PREVIOUSLY_HOME = home;
-  process.env.PREVIOUSLY_CONFIG = fakeConfig;
-  process.env.PREVIOUSLY_PLUGINS = fakePlugins;
-  process.env.PREVIOUSLY_SKILLS = fakeSkills;
+  process.env.PUNK_RECORDS_HOME = home;
+  process.env.PUNK_RECORDS_CONFIG = fakeConfig;
+  process.env.PUNK_RECORDS_PLUGINS = fakePlugins;
+  process.env.PUNK_RECORDS_SKILLS = fakeSkills;
   try {
   const first = initRepo({ cwd: tmp, explicit: "global" });
   // plugin symlink installed: the real file, never the directory
-  const link = path.join(fakePlugins, "previously.ts");
+  const link = path.join(fakePlugins, "punk-records.ts");
   assert.equal(fs.readlinkSync(link), PLUGIN_FILE);
   // global MCP config merged (flat key)
   const oc = JSON.parse(fs.readFileSync(fakeConfig, "utf8"));
   assert.ok(oc.mcp["punk-records"]);
   assert.equal(oc.mcp["punk-records"].type, "local");
   // global skill symlinked
-  const skillLink = path.join(fakeSkills, "previously");
-  assert.equal(fs.readlinkSync(skillLink), path.join(ROOT, "skills", "previously"));
+  const skillLink = path.join(fakeSkills, "punk-records");
+  assert.equal(fs.readlinkSync(skillLink), path.join(ROOT, "skills", "punk-records"));
   // repo-local files untouched by explicit global run outside a repo
   assert.ok(!fs.existsSync(path.join(tmp, "AGENTS.md")));
   assert.ok(!fs.existsSync(path.join(tmp, "opencode.json")));
@@ -202,26 +202,26 @@ test("global init wires plugin symlink and global MCP config", () => {
   assert.equal(fs.readFileSync(path.join(home, "events.jsonl"), "utf8"), before.store);
   assert.deepEqual(second.touched, []);
   } finally {
-    if (prevHome === undefined) delete process.env.PREVIOUSLY_HOME;
-    else process.env.PREVIOUSLY_HOME = prevHome;
-    if (prevConfig === undefined) delete process.env.PREVIOUSLY_CONFIG;
-    else process.env.PREVIOUSLY_CONFIG = prevConfig;
-    if (prevPlugins === undefined) delete process.env.PREVIOUSLY_PLUGINS;
-    else process.env.PREVIOUSLY_PLUGINS = prevPlugins;
-    if (prevSkills === undefined) delete process.env.PREVIOUSLY_SKILLS;
-    else process.env.PREVIOUSLY_SKILLS = prevSkills;
+    if (prevHome === undefined) delete process.env.PUNK_RECORDS_HOME;
+    else process.env.PUNK_RECORDS_HOME = prevHome;
+    if (prevConfig === undefined) delete process.env.PUNK_RECORDS_CONFIG;
+    else process.env.PUNK_RECORDS_CONFIG = prevConfig;
+    if (prevPlugins === undefined) delete process.env.PUNK_RECORDS_PLUGINS;
+    else process.env.PUNK_RECORDS_PLUGINS = prevPlugins;
+    if (prevSkills === undefined) delete process.env.PUNK_RECORDS_SKILLS;
+    else process.env.PUNK_RECORDS_SKILLS = prevSkills;
   }
 });
 
 test("local init links the plugin file and its hints run without previously on PATH", t => {
   const tmp = fixture(t);
   initRepo({ cwd: tmp });
-  assert.equal(fs.readlinkSync(path.join(tmp, ".opencode", "plugins", "previously.ts")), PLUGIN_FILE);
+  assert.equal(fs.readlinkSync(path.join(tmp, ".opencode", "plugins", "punk-records.ts")), PLUGIN_FILE);
   const agents = fs.readFileSync(path.join(tmp, "AGENTS.md"), "utf8");
   assert.ok(agents.includes(`node ${BIN}`), "AGENTS hints must not require mem on PATH");
   // the generated hint is executable as written, even with an empty PATH
   const run = spawnSync(process.execPath, [BIN, "save", "--global", "--type", "note", "--title", "init hint"],
-    { cwd: tmp, env: { ...process.env, PATH: "", PREVIOUSLY_HOME: path.join(tmp, "home") }, encoding: "utf8" });
+    { cwd: tmp, env: { ...process.env, PATH: "", PUNK_RECORDS_HOME: path.join(tmp, "home") }, encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /memoryId/);
 });
@@ -255,10 +255,10 @@ test("a config in the opposite API format blocks init before any write", t => {
 
 test("a foreign plugin is left alone", t => {
   const other = fixture(t);
-  const foreign = path.join(other, "plugins", "previously.ts");
+  const foreign = path.join(other, "plugins", "punk-records.ts");
   fs.mkdirSync(path.dirname(foreign), { recursive: true });
   fs.writeFileSync(foreign, "export default {id: 'someone-else'};\n");
   initRepo({ cwd: other, explicit: "global" });
   assert.equal(fs.readFileSync(foreign, "utf8"), "export default {id: 'someone-else'};\n");
-  assert.equal(fs.existsSync(path.join(other, "skills", "previously")), true);
+  assert.equal(fs.existsSync(path.join(other, "skills", "punk-records")), true);
 });

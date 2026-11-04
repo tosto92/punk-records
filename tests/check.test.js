@@ -24,7 +24,7 @@ test('check rejects unsafe records and derived symlinks', (t) => {
 });
 
 test("check passes after build, fails after appending event without rebuild", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "previously-check-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-check-"));
   const resolved = { writes: ["global"], repoRoot: null, repoName: "" };
   appendEvent({ dir, event: normalizeEvent({ type: "note", title: "first" }, resolved) });
   buildScope(dir);
@@ -40,7 +40,7 @@ test("check passes after build, fails after appending event without rebuild", ()
 });
 
 test("check flags extra and missing derived files", () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "previously-check2-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-check2-"));
   const resolved = { writes: ["global"], repoRoot: null, repoName: "" };
   appendEvent({ dir, event: normalizeEvent({ type: "note", title: "only one" }, resolved) });
   buildScope(dir);
@@ -59,19 +59,19 @@ test("check flags extra and missing derived files", () => {
 });
 
 test("checkScope returns clean for an empty scope and CLI exits 0/1", () => {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "previously-check-home-"));
-  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "previously-check-cwd-"));
-  const env = { ...process.env, PREVIOUSLY_HOME: home };
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-check-home-"));
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), "punk-records-check-cwd-"));
+  const env = { ...process.env, PUNK_RECORDS_HOME: home };
   assert.deepEqual(checkScope(home), { stale: false, drift: [] });
-  execFileSync("node", ["bin/previously", "save", "--type", "note", "--title", "cli check", "--global"], {
+  execFileSync("node", ["bin/punk-records", "save", "--type", "note", "--title", "cli check", "--global"], {
     env,
     cwd: path.resolve(import.meta.dirname, ".."),
   });
-  execFileSync("node", ["bin/previously", "build", "--global"], {
+  execFileSync("node", ["bin/punk-records", "build", "--global"], {
     env,
     cwd: path.resolve(import.meta.dirname, ".."),
   });
-  const mem = path.resolve(import.meta.dirname, "..", "bin", "previously");
+  const mem = path.resolve(import.meta.dirname, "..", "bin", "punk-records");
   execFileSync("node", [mem, "check", "--global"], { env, cwd: elsewhere });
   appendEvent({ dir: home, event: normalizeEvent({ type: "note", title: "later" }, { writes: ["global"], repoRoot: null, repoName: "" }) });
   try {
@@ -99,7 +99,7 @@ test('jsonl_edit_and_rebuild_still_scanned', t => {
   const logs = []; t.mock.method(console, 'error', line => logs.push(line));
   assert.deepEqual(search({query: 'deploy', resolved: f.resolved}), []);
   assert.doesNotMatch(logs.join('\n'), /quarantined|QUARANTINED|Ignore/);
-  const graph = execFileSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/previously'), 'graph', '--global'],
+  const graph = execFileSync(process.execPath, [path.resolve(import.meta.dirname, '../bin/punk-records'), 'graph', '--global'],
     {cwd: f.home, env: process.env, encoding: 'utf8'});
   assert.ok(graph.length > 0);
 });

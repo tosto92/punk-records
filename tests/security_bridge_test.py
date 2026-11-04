@@ -144,7 +144,7 @@ class BridgeTests(unittest.TestCase):
         for name in ('benign_en', 'benign_it'):
             with self.subTest(name=name):
                 self.assertEqual(run_bridge(name)['results'][0]['status'], 'no_signals')
-        for name in ('override_en', 'override_it', 'fake_previously_close', 'blanket_approval',
+        for name in ('override_en', 'override_it', 'fake_punk_records_close', 'fake_previously_close', 'blanket_approval',
                      'hidden_unicode', 'quoted_attack', 'negated_attack'):
             with self.subTest(name=name):
                 result = run_bridge(name)['results'][0]
