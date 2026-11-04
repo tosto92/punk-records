@@ -270,6 +270,9 @@ Your memories stay in `memory/` and the selected global store until you delete t
 
 ## Upgrading an existing installation
 
+For a preview-first helper covering shell variables, executable links and selected
+projects, see [device reconciliation](docs/reconciliation.md).
+
 Runtime commands, skills, configuration variables and project markers now use
 Punk Records names. The CLI for browsing sessions is `punk-records sessions`.
 `brainbrain` and `brainbrain-synthesize` remain explicit shortcut commands.

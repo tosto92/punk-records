@@ -269,3 +269,61 @@ test('undecodable managed TOML HOME refuses store relocation without changing co
   assert.ok(!fs.existsSync(current));
   assert.ok(!fs.existsSync(path.join(process.env.HOME, '.codex/hooks.json')));
 });
+
+for (const name of ['punk-records', 'previously']) for (const environment of ['inline', 'table']) test(`managed TOML accepts reordered keys and preserves tools (${name}, ${environment})`, t => {
+  const {cwd, old, current} = sandbox(t);
+  fs.mkdirSync(old, {recursive: true}); fs.writeFileSync(path.join(old, 'events.jsonl'), 'original events');
+  const file = path.join(process.env.HOME, '.codex/config.toml');
+  fs.mkdirSync(path.dirname(file), {recursive: true});
+  const env = environment === 'inline' ? `env = { ${name === 'previously' ? 'PREVIOUSLY' : 'PUNK_RECORDS'}_HOME = ${JSON.stringify(old)}, PUNK_RECORDS_SYNTHESIS = "1" } # keep env comment\n` : '';
+  const envTable = environment === 'table' ? `\n[mcp_servers.${name}.env] # keep table comment\nPREVIOUSLY_HOME = ${JSON.stringify(old)}\nPUNK_RECORDS_SYNTHESIS = "1"\n` : '';
+  const tools = `\n[mcp_servers.${name}.tools.memory_find]\napproval_mode = "prompt"\nPREVIOUSLY_HOME = "tool literal" # not environment\nPUNK_RECORDS_HOME = "other tool literal"\n\n[mcp_servers.${name}.tools.memory_save]\napproval_mode = "auto"\n`;
+  const text = `before = "keep"\n# ${name}:start\n[mcp_servers.${name}]\n${env}# keep invocation comment\nargs = ["/old/bin/${name}", "mcp"] # keep args comment\ncommand = "node" # keep command comment\nstartup_timeout_sec = 20\n${envTable}${tools}# ${name}:end\n`;
+  fs.writeFileSync(file, text);
+  initRepo({cwd, explicit: 'global', agents: ['codex']});
+  const result = fs.readFileSync(file, 'utf8');
+  assert.ok(result.includes(tools.replaceAll(`mcp_servers.${name}`, 'mcp_servers.punk-records')));
+  assert.ok(result.includes(JSON.stringify(current)));
+  for (const preserved of ['before = "keep"', '# keep invocation comment', '# keep args comment', '# keep command comment', 'startup_timeout_sec = 20', 'PUNK_RECORDS_SYNTHESIS = "1"']) assert.ok(result.includes(preserved));
+  assert.ok(result.includes(JSON.stringify(path.resolve('bin/punk-records'))));
+  assert.doesNotMatch(result, /\[mcp_servers\.previously|# previously:/);
+  assert.equal(fs.readFileSync(path.join(current, 'events.jsonl'), 'utf8'), 'original events');
+  assert.deepEqual(initRepo({cwd, explicit: 'global', agents: ['codex']}).touched, []);
+});
+
+for (const invalid of ['duplicate invocation', 'foreign subtable', 'invocation only in tools']) test(`managed TOML rejects ambiguous ${invalid} before store migration`, t => {
+  const {cwd, old, current} = sandbox(t);
+  fs.mkdirSync(old, {recursive: true}); fs.writeFileSync(path.join(old, 'events.jsonl'), 'original events');
+  const file = path.join(process.env.HOME, '.codex/config.toml');
+  fs.mkdirSync(path.dirname(file), {recursive: true});
+  const invocation = 'command = "node"\nargs = ["/old/bin/punk-records", "mcp"]\n';
+  const extra = invalid === 'duplicate invocation' ? invocation + invocation : invalid === 'foreign subtable' ? invocation + '[mcp_servers.foreign.tools.memory_find]\napproval_mode = "auto"\n' : '[mcp_servers.punk-records.tools.memory_find]\n' + invocation;
+  const text = '# punk-records:start\n[mcp_servers.punk-records]\n' + extra + '# punk-records:end\n';
+  fs.writeFileSync(file, text);
+  assert.throws(() => initRepo({cwd, explicit: 'global', agents: ['codex']}), /custom managed MCP block/);
+  assert.equal(fs.readFileSync(file, 'utf8'), text);
+  assert.equal(fs.readFileSync(path.join(old, 'events.jsonl'), 'utf8'), 'original events');
+  assert.ok(!fs.existsSync(current));
+});
+
+for (const form of ['dotted', 'quoted', 'quoted dotted', 'escaped quoted', 'multiline']) test(`unsupported root TOML environment refuses store relocation (${form})`, t => {
+  const {cwd, old, current} = sandbox(t);
+  fs.mkdirSync(old, {recursive: true}); fs.writeFileSync(path.join(old, 'events.jsonl'), 'original events');
+  const file = path.join(process.env.HOME, '.codex/config.toml');
+  fs.mkdirSync(path.dirname(file), {recursive: true});
+  const value = JSON.stringify(old);
+  const env = {
+    dotted: `env.PUNK_RECORDS_HOME = ${value}`,
+    quoted: `"env" = { PUNK_RECORDS_HOME = ${value} }`,
+    'quoted dotted': `'env'.PUNK_RECORDS_HOME = ${value}`,
+    'escaped quoted': `"\\u0065nv" = { PUNK_RECORDS_HOME = ${value} }`,
+    multiline: `env = {\nPUNK_RECORDS_HOME = ${value}\n}`,
+  }[form];
+  const text = `# punk-records:start\n[mcp_servers.punk-records]\n${env}\ncommand = "node"\nargs = ["/old/bin/punk-records", "mcp"]\n# punk-records:end\n`;
+  fs.writeFileSync(file, text);
+  assert.throws(() => initRepo({cwd, explicit: 'global', agents: ['codex']}), /custom managed MCP block/);
+  assert.equal(fs.readFileSync(file, 'utf8'), text);
+  assert.equal(fs.readFileSync(path.join(old, 'events.jsonl'), 'utf8'), 'original events');
+  assert.ok(!fs.existsSync(current));
+  assert.ok(!fs.existsSync(path.join(process.env.HOME, '.codex/hooks.json')));
+});
