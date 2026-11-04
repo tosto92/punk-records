@@ -50,3 +50,21 @@ test('actual npm artifact scans benign and suspicious memories outside the check
     if (expectedStatus === 'suspicious') assert.ok(report.results[0].matches.some(match => match.ruleName === 'PreviouslyInstructionOverride'));
   }
 });
+
+
+test('npm artifact excludes Python caches even after local execution', t => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-package-cache-'));
+  t.after(() => fs.rmSync(temp, {recursive: true, force: true}));
+  const source = path.join(temp, 'source'); fs.mkdirSync(source);
+  fs.copyFileSync(path.join(checkout, 'package.json'), path.join(source, 'package.json'));
+  fs.cpSync(path.join(checkout, 'lib'), path.join(source, 'lib'), {recursive: true});
+  for (const relative of ['security/__pycache__/scan.cpython-312.pyc', 'episodes/__pycache__/sessions.cpython-310.pyc', 'security/scan.pyc', 'episodes/sessions.pyo']) {
+    const file = path.join(source, 'lib', relative);
+    fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, 'synthetic bytecode');
+  }
+  const packed = spawnSync('npm', ['pack', '--json', '--pack-destination', temp], {cwd: source, encoding: 'utf8', timeout: 60000});
+  assert.equal(packed.status, 0, String(packed.error || packed.stderr));
+  const files = JSON.parse(packed.stdout)[0].files.map(f => f.path);
+  assert.deepEqual(files.filter(f => f.includes('__pycache__/') || /\.py[co]$/.test(f)), []);
+  for (const file of ['lib/security/scan.py', 'lib/episodes/sessions.py', 'lib/security/rules/manifest.json']) assert.ok(files.includes(file), file);
+});
