@@ -1,0 +1,165 @@
+{
+  "description": "Frozen before candidate development; synthetic prompts, existing synthetic memories. Not statistical independence.",
+  "cases": [
+    {
+      "id": "validation-n1",
+      "source": "synthetic",
+      "prompt": "il lavoro è terminato",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n2",
+      "source": "synthetic",
+      "prompt": "tutto fatto",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n3",
+      "source": "synthetic",
+      "prompt": "va bene così",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n4",
+      "source": "synthetic",
+      "prompt": "procediamo pure",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n5",
+      "source": "synthetic",
+      "prompt": "grazie mille",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n6",
+      "source": "synthetic",
+      "prompt": "all good",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n7",
+      "source": "synthetic",
+      "prompt": "ready to continue",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n8",
+      "source": "synthetic",
+      "prompt": "please go ahead",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n9",
+      "source": "synthetic",
+      "prompt": "commit su main",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-n10",
+      "source": "synthetic",
+      "prompt": "fai il merge",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "validation-p1",
+      "source": "synthetic",
+      "prompt": "Modbus Redis gateway pending",
+      "expected": "useful",
+      "memoryLabels": [
+        "modbus"
+      ]
+    },
+    {
+      "id": "validation-p2",
+      "source": "synthetic",
+      "prompt": "AnyDesk relay detection stream",
+      "expected": "useful",
+      "memoryLabels": [
+        "anydesk"
+      ]
+    },
+    {
+      "id": "validation-p3",
+      "source": "synthetic",
+      "prompt": "Codex hooks configuration settings",
+      "expected": "useful",
+      "memoryLabels": [
+        "codex"
+      ]
+    },
+    {
+      "id": "validation-p4",
+      "source": "synthetic",
+      "prompt": "recall poco pertinente ranking query",
+      "expected": "useful",
+      "memoryLabels": [
+        "recall"
+      ]
+    },
+    {
+      "id": "validation-p5",
+      "source": "synthetic",
+      "prompt": "commit errore hook signing gpg",
+      "expected": "useful",
+      "memoryLabels": [
+        "commit-error"
+      ]
+    },
+    {
+      "id": "validation-p6",
+      "source": "synthetic",
+      "prompt": "push rejected nonfastforward origin remoto",
+      "expected": "useful",
+      "memoryLabels": [
+        "push-error"
+      ]
+    },
+    {
+      "id": "validation-p7",
+      "source": "synthetic",
+      "prompt": "merge conflitto rename resolver file",
+      "expected": "useful",
+      "memoryLabels": [
+        "merge-error"
+      ]
+    },
+    {
+      "id": "validation-p8",
+      "source": "synthetic",
+      "prompt": "TLS certificate verify failed",
+      "expected": "useful",
+      "memoryLabels": [
+        "tls-error"
+      ]
+    },
+    {
+      "id": "validation-p9",
+      "source": "synthetic",
+      "prompt": "lexer token boundary regressione parser",
+      "expected": "useful",
+      "memoryLabels": [
+        "lexer"
+      ]
+    },
+    {
+      "id": "validation-p10",
+      "source": "synthetic",
+      "prompt": "sessione login Kerberos expired ticket",
+      "expected": "useful",
+      "memoryLabels": [
+        "session-error"
+      ]
+    }
+  ]
+}

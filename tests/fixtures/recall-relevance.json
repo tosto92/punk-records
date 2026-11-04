@@ -1,0 +1,396 @@
+{
+  "description": "Prompt-only automatic recall benchmark. All memories are synthetic; only prompts marked observed came from analyst-provided history. Heldout cases fixed before baseline and excluded from tuning. The fai prefix was added as an explicit scope correction after baseline measurement; heldout metrics after that correction are validation of a previously measured set, not fresh heldout evidence.",
+  "filterScope": "Whole ACK phrases and optional fai/proceed/continue prefix plus commit/push/merge with optional in/su/on/to/into main. No ranking/stopword changes.",
+  "memories": [
+    {
+      "label": "ack",
+      "title": "Ricevuto perfetto va bene tutto ok done looks good",
+      "solution": "Synthetic acknowledgement lexical distractor."
+    },
+    {
+      "label": "operations",
+      "title": "Commit main push merge",
+      "solution": "Synthetic operational lexical distractor."
+    },
+    {
+      "label": "modbus",
+      "title": "Modbus Redis gateway",
+      "solution": "fatto il controllo della coda; usare il gateway Redis."
+    },
+    {
+      "label": "anydesk",
+      "title": "AnyDesk relay detection",
+      "solution": "fatto il controllo dei flussi."
+    },
+    {
+      "label": "codex",
+      "title": "Codex hooks configuration",
+      "solution": "Verificare la configurazione dei hooks Codex."
+    },
+    {
+      "label": "recall",
+      "title": "Recall poco pertinente ranking",
+      "solution": "Valutare la pertinenza del recall con query tecniche."
+    },
+    {
+      "label": "commit-error",
+      "title": "Commit fallisce errore hook signing gpg",
+      "solution": "Ripristinare la firma GPG prima del commit."
+    },
+    {
+      "label": "push-error",
+      "title": "Push rejected nonfastforward origin",
+      "solution": "Confrontare la cronologia di origin prima del push."
+    },
+    {
+      "label": "merge-error",
+      "title": "Merge conflitto rename resolver",
+      "solution": "Risolvere il conflitto di rename prima del merge."
+    },
+    {
+      "label": "tls-error",
+      "title": "Errore TLS certificate verify",
+      "solution": "Installare la CA corretta."
+    },
+    {
+      "label": "lexer",
+      "title": "Perfetto lexer token boundary regressione",
+      "solution": "Verificare il confine dei token nel lexer."
+    },
+    {
+      "label": "main-error",
+      "title": "Main branch diverged upstream confronto",
+      "solution": "Confrontare i due rami prima di integrare."
+    },
+    {
+      "label": "hook-timeout",
+      "title": "Hook timeout Codex UserPromptSubmit",
+      "solution": "Correlare il timeout con il nome evento."
+    },
+    {
+      "label": "session-error",
+      "title": "Sessione login Kerberos expired",
+      "solution": "Rinnovare il ticket di login Kerberos."
+    }
+  ],
+  "cases": [
+    {
+      "id": "tuning-01",
+      "split": "tuning",
+      "source": "observed",
+      "prompt": "fatto",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "tuning-02",
+      "split": "tuning",
+      "source": "observed",
+      "prompt": "commit in main",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "tuning-03",
+      "split": "tuning",
+      "source": "observed",
+      "prompt": "procedi con commit",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "tuning-04",
+      "split": "tuning",
+      "source": "observed",
+      "prompt": "merge in main",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "tuning-05",
+      "split": "tuning",
+      "source": "observed",
+      "prompt": "verifichiamo anche com’è la situazione per codex",
+      "expected": "useful",
+      "memoryLabels": [
+        "codex",
+        "hook-timeout"
+      ]
+    },
+    {
+      "id": "tuning-06",
+      "split": "tuning",
+      "source": "observed",
+      "prompt": "perchè recall poco pertinente?",
+      "expected": "useful",
+      "memoryLabels": [
+        "recall"
+      ]
+    },
+    {
+      "id": "tuning-07",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "ricevuto",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "ricevuto"
+    },
+    {
+      "id": "tuning-08",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "perfetto",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "perfetto"
+    },
+    {
+      "id": "tuning-09",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "va bene",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "va bene"
+    },
+    {
+      "id": "tuning-10",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "looks good",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "looks good"
+    },
+    {
+      "id": "tuning-11",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "push",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "push"
+    },
+    {
+      "id": "tuning-12",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "merge",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "merge"
+    },
+    {
+      "id": "tuning-13",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "commit",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "commit"
+    },
+    {
+      "id": "tuning-14",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "commit fallisce con errore hook signing",
+      "expected": "useful",
+      "memoryLabels": [
+        "commit-error"
+      ],
+      "pair": "commit"
+    },
+    {
+      "id": "tuning-15",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "push rejected nonfastforward origin",
+      "expected": "useful",
+      "memoryLabels": [
+        "push-error"
+      ],
+      "pair": "push"
+    },
+    {
+      "id": "tuning-16",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "merge conflitto rename resolver",
+      "expected": "useful",
+      "memoryLabels": [
+        "merge-error"
+      ],
+      "pair": "merge"
+    },
+    {
+      "id": "tuning-17",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "ricevuto errore TLS certificate verify",
+      "expected": "useful",
+      "memoryLabels": [
+        "tls-error"
+      ],
+      "pair": "ricevuto"
+    },
+    {
+      "id": "tuning-18",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "perfetto lexer token boundary",
+      "expected": "useful",
+      "memoryLabels": [
+        "lexer"
+      ],
+      "pair": "perfetto"
+    },
+    {
+      "id": "tuning-19",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "va bene Modbus Redis gateway",
+      "expected": "useful",
+      "memoryLabels": [
+        "modbus"
+      ],
+      "pair": "va bene"
+    },
+    {
+      "id": "tuning-20",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "looks good diagnosi lexer token boundary regressione",
+      "expected": "useful",
+      "memoryLabels": [
+        "lexer"
+      ],
+      "pair": "looks good"
+    },
+    {
+      "id": "tuning-21",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "commit in main fallisce con errore hook signing gpg",
+      "expected": "useful",
+      "memoryLabels": [
+        "commit-error"
+      ],
+      "pair": "commit in main"
+    },
+    {
+      "id": "tuning-22",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "main",
+      "expected": "ambiguous",
+      "memoryLabels": []
+    },
+    {
+      "id": "tuning-23",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "commit hook",
+      "expected": "ambiguous",
+      "memoryLabels": []
+    },
+    {
+      "id": "tuning-24",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "sessione",
+      "expected": "ambiguous",
+      "memoryLabels": []
+    },
+    {
+      "id": "heldout-25",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "tutto ok",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "heldout-26",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "done",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "heldout-27",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "procedi con push in main",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "heldout-28",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "continue with the merge",
+      "expected": "none",
+      "memoryLabels": []
+    },
+    {
+      "id": "heldout-29",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "main branch diverged upstream confronto",
+      "expected": "useful",
+      "memoryLabels": [
+        "main-error"
+      ]
+    },
+    {
+      "id": "heldout-30",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "hook timeout Codex UserPromptSubmit",
+      "expected": "useful",
+      "memoryLabels": [
+        "hook-timeout"
+      ]
+    },
+    {
+      "id": "heldout-31",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "sessione login Kerberos expired",
+      "expected": "useful",
+      "memoryLabels": [
+        "session-error"
+      ]
+    },
+    {
+      "id": "heldout-32",
+      "split": "heldout",
+      "source": "synthetic",
+      "prompt": "errore",
+      "expected": "ambiguous",
+      "memoryLabels": []
+    },
+    {
+      "id": "tuning-33",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "fai push",
+      "expected": "none",
+      "memoryLabels": [],
+      "pair": "fai push"
+    },
+    {
+      "id": "tuning-34",
+      "split": "tuning",
+      "source": "synthetic",
+      "prompt": "fai push rejected nonfastforward origin",
+      "expected": "useful",
+      "memoryLabels": [
+        "push-error"
+      ],
+      "pair": "fai push"
+    }
+  ]
+}

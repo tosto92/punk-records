@@ -1,0 +1,7 @@
+{
+  "commonAttenuation": 0.05,
+  "idfCap": 3,
+  "unknownPenalty": 0.3,
+  "minEvidence": 3,
+  "minCoverage": 0.6
+}

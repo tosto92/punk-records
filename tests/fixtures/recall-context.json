@@ -1,0 +1,23 @@
+{
+  "description": "Synthetic contextual contrast set; not unseen validation or observed task outcomes. Each repeated prompt has a different contextual need. Group IDs are synthetic explicit provenance, not inferred from scope.",
+  "memories": [
+    {"label": "merge-policy", "title": "Merge policy", "solution": "For this project merge only after the rename regression test passes.", "projectId": "p1", "sessionId": "s1"},
+    {"label": "hook-event", "title": "Hook timeout Codex UserPromptSubmit", "solution": "Record event and command to attribute the timeout before changing settings.", "projectId": "p1", "sessionId": "s2"},
+    {"label": "case-relay", "title": "Relay case checkpoint", "solution": "The unresolved check is the relay connection at 09:14 UTC.", "projectId": "p2", "sessionId": "s3"},
+    {"label": "merge-other", "title": "Merge policy unrelated project", "solution": "Run the migration check before integration.", "projectId": "p2", "sessionId": "s4"}
+  ],
+  "cases": [
+    {"id": "context-merge-action", "prompt": "merge", "expected": "none", "memoryLabels": [],
+      "assessment": {"provenance": "synthetic", "context": "All checks including the rename regression passed. The user already approved the integration and asks to execute it.", "rationale": "The project constraint is already satisfied and available in context; repeating the policy adds no needed fact."}},
+    {"id": "context-merge-history", "prompt": "merge", "expected": "useful", "memoryLabels": ["merge-policy"],
+      "assessment": {"provenance": "synthetic", "context": "The assistant asked which saved project policy to retrieve. The user names merge; the policy is not otherwise in context.", "rationale": "A successful answer identifies the rename regression prerequisite from the project memory."}},
+    {"id": "context-hook-known", "prompt": "hook timeout Codex UserPromptSubmit", "expected": "none", "memoryLabels": [],
+      "assessment": {"provenance": "synthetic", "context": "The timeout is already attributed to the exact event and command. The user is supplying the requested issue title, not asking for another diagnosis.", "rationale": "The recalled attribution advice adds no missing information to the title-entry task."}},
+    {"id": "context-hook-history", "prompt": "hook timeout Codex UserPromptSubmit", "expected": "useful", "memoryLabels": ["hook-event"],
+      "assessment": {"provenance": "synthetic", "context": "The user identifies the earlier incident whose diagnostic procedure they want to recover. No procedure is in context.", "rationale": "A successful answer recovers the requirement to identify event and command before changing settings."}},
+    {"id": "context-resume-known", "prompt": "riprendi l'indagine", "expected": "none", "memoryLabels": [],
+      "assessment": {"provenance": "synthetic", "context": "The complete checkpoint is already in the conversation: check the unresolved relay connection at 09:14 UTC.", "rationale": "The next action and its time are already available; no additional memory fact is required."}},
+    {"id": "context-resume-missing", "prompt": "riprendi l'indagine", "expected": "useful", "memoryLabels": ["case-relay"],
+      "assessment": {"provenance": "synthetic", "context": "The active project contains one paused relay investigation; its prior checkpoint is not in this conversation.", "rationale": "A successful answer recovers the unresolved relay check and 09:14 UTC time from memory; prompt-only lexical matching lacks the topic."}}
+  ]
+}

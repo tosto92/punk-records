@@ -78,7 +78,7 @@ test('automatic recall uses only the prompt, not dirty files or the repository b
 
 test('whole acknowledgements do not recall context, including NFC and punctuation variants', t => {
   const cwd = repo(t);
-  const words = ['ok', 'okay', 'si', 'sì', 'yes', 'continua', 'continue', 'procedi', 'vai', 'grazie', 'thanks', 'ottimo', 'fatto', 'done', 'eseguito', 'completato'];
+  const words = ['ok', 'okay', 'si', 'sì', 'yes', 'continua', 'continue', 'procedi', 'vai', 'grazie', 'thanks', 'ottimo', 'fatto', 'done', 'eseguito', 'completato', 'ricevuto', 'perfetto', 'va bene', 'tutto ok', 'looks good'];
   saveMemory({type: 'solved', title: words.join(' '), solution: 'ACK_DISTRACTOR'}, {cwd});
   for (const word of [...words, 'si\u0300']) {
     for (const prompt of [word, ` ${word.toUpperCase()}!!! `]) assert.equal(recallBlock(prompt, cwd), '', prompt);
@@ -165,9 +165,9 @@ test('derived cards label and bound escaped source provenance', t => {
 
 test('operational commit acknowledgements stay empty while commit failures remain searchable', t => {
   const cwd = repo(t);
-  saveMemory({type: 'solved', title: 'procedi con commit proceed with the commit go ahead', solution: 'ACK_DISTRACTOR'}, {cwd});
+  saveMemory({type: 'solved', title: 'procedi con commit push merge main proceed with the commit go ahead', solution: 'ACK_DISTRACTOR'}, {cwd});
   saveMemory({type: 'solved', title: 'commit fallisce con errore hook', solution: 'Fix the failing hook'}, {cwd});
-  for (const prompt of ['procedi con commit', 'PROCEDI CON IL COMMIT!!!', 'proceed with commit', 'continue with the commit', 'go ahead with commit']) {
+  for (const prompt of ['procedi con commit', 'PROCEDI CON IL COMMIT!!!', 'proceed with commit', 'continue with the commit', 'go ahead with commit', 'commit', 'push', 'merge', 'fai push', 'commit in main', 'merge in main', 'push su main', 'go ahead with push to main', ' PROCEDI\tCON MERGE\nIN MAIN!!! ']) {
     assert.equal(recallBlock(prompt, cwd), '', prompt);
   }
   assert.match(recallBlock('commit fallisce con errore hook', cwd), /Fix the failing hook/);
