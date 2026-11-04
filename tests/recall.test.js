@@ -78,7 +78,7 @@ test('automatic recall uses only the prompt, not dirty files or the repository b
 
 test('whole acknowledgements do not recall context, including NFC and punctuation variants', t => {
   const cwd = repo(t);
-  const words = ['ok', 'okay', 'si', 'sì', 'yes', 'continua', 'continue', 'procedi', 'vai', 'grazie', 'thanks', 'ottimo'];
+  const words = ['ok', 'okay', 'si', 'sì', 'yes', 'continua', 'continue', 'procedi', 'vai', 'grazie', 'thanks', 'ottimo', 'fatto', 'done', 'eseguito', 'completato'];
   saveMemory({type: 'solved', title: words.join(' '), solution: 'ACK_DISTRACTOR'}, {cwd});
   for (const word of [...words, 'si\u0300']) {
     for (const prompt of [word, ` ${word.toUpperCase()}!!! `]) assert.equal(recallBlock(prompt, cwd), '', prompt);
@@ -187,4 +187,13 @@ test('automatic wrapper keeps relevant project cards and omits conversational di
   assert.equal(recallBlock('perchè recall poco pertinente?', cwd), '');
   assert.equal(recallBlock('procedi con commit', cwd), '');
   assert.match(recallBlock('Come funziona Modbus con Redis?', cwd), /Modbus Redis/);
+});
+
+test('completion acknowledgements do not recall incidental global body matches', t => {
+  const cwd = repo(t);
+  saveMemory({type: 'solved', title: 'Modbus Redis receiver', solution: 'fatto il controllo della coda'}, {cwd, scope: 'global'});
+  saveMemory({type: 'solved', title: 'AnyDesk relay detection', solution: 'fatto il controllo dei flussi'}, {cwd, scope: 'global'});
+  assert.equal(recallBlock('fatto', cwd), '');
+  assert.match(recallBlock('Modbus Redis receiver', cwd), /Modbus Redis receiver/);
+  assert.match(recallBlock('fatto il controllo Modbus Redis receiver', cwd), /Modbus Redis receiver/);
 });
