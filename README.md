@@ -17,6 +17,8 @@ recalls them when they matter in **Claude Code**, **Codex** and **OpenCode**.
 
 Optional [incremental synthesis](docs/synthesis.md) combines selected Punk Records memories and native Markdown files into reviewed summaries. An agent you choose generates the drafts; its provider may receive the selected content and charge for model usage. Review and publish in the **Synthesis** tab of `punk-records serve`. Summary recall is opt-in; originals stay available.
 
+[Deferred learning](docs/deferred-learning.md) extracts evidence-linked proposals from explicitly selected Claude/Codex transcripts with a worker you choose. `punk-records learn` keeps incremental checkpoints and private review artifacts; proposals stay outside recall until you separately review and save them.
+
 ```mermaid
 flowchart LR
   P([Your prompt]) --> R[Recall<br/>matching memories injected]
