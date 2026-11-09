@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {automaticTokens, rankCurrent, analyzeQuery, rankCandidate, DEFAULT_PARAMETERS, PARAMETER_GRID} from '../lib/automatic-ranking.js';
 import {search} from '../lib/ask.js';
+import * as ranking from '../lib/automatic-ranking.js';
 
 const memory = (title, extra = {}) => ({memoryId: title, title, ...extra});
 const admitted = (candidates, query) => rankCandidate(candidates, query).filter(hit => hit.admitted);
@@ -182,7 +183,11 @@ test('current ranking returns no hits for empty candidates, fields or effective 
   for (const query of ['', undefined, 'grazie please']) assert.deepEqual([...rankCurrent([{title: 'redis'}], query)], []);
 });
 
-test('ask automatic integration keeps current scores and success/date/slug tie ordering', t => {
+test('automatic production parameters match the evaluated conservative selection', () => {
+  assert.deepEqual(ranking.AUTOMATIC_PARAMETERS, JSON.parse(fs.readFileSync(new URL('./fixtures/recall-evidence-parameters.json', import.meta.url))));
+});
+
+test('ask automatic integration uses candidate evidence and keeps success/date/slug tie ordering', t => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'automatic-ranking-'));
   const names = ['PUNK_RECORDS_HOME', 'PUNK_RECORDS_SECURITY', 'PUNK_RECORDS_SYNTHESIS'];
   const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
@@ -203,7 +208,8 @@ test('ask automatic integration keeps current scores and success/date/slug tie o
     tags: [], files: [], symptoms: '', solution: '', ...candidate,
   })).join('\n') + '\n');
   const hits = search({query: 'redis', automatic: true, resolved: {repoRoot: null}, limit: 10});
-  assert.deepEqual(hits.map(hit => hit.title), ['Redis alpha', 'Redis beta', 'Redis old', 'Redis newest', 'Other note']);
-  const scores = rankCurrent(candidates, 'redis');
-  for (const hit of hits) assert.equal(hit.score, scores.get(candidates.find(candidate => candidate.title === hit.title)));
+  assert.deepEqual(hits.map(hit => hit.title), ['Redis alpha', 'Redis beta', 'Redis old', 'Redis newest']);
+  const scores = rankCandidate(candidates, 'redis', JSON.parse(fs.readFileSync(new URL('./fixtures/recall-evidence-parameters.json', import.meta.url))));
+  for (const hit of hits) assert.equal(hit.score, scores[candidates.findIndex(candidate => candidate.title === hit.title)].score);
+  assert.ok(search({query: 'redis', resolved: {repoRoot: null}, limit: 10}).some(hit => hit.title === 'Other note'), 'explicit search still admits weak body matches');
 });

@@ -74,6 +74,7 @@ test('CLI statistics is opt-in, private, and does not affect retrieval decisions
     fs.writeFileSync(input, JSON.stringify({memories, cases}));
     const args = ['--fixture', input, '--out', output];
     const plain = await runCli(args);
+    assert.deepEqual(plain.parameters, JSON.parse(fs.readFileSync(new URL('./fixtures/recall-evidence-parameters.json', import.meta.url))));
     const enriched = await runCli([...args, '--statistics']);
     assert.equal(plain.fixture.candidate.cases[0].statistics, undefined);
     assert.ok(enriched.fixture.candidate.cases[0].statistics);

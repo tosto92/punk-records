@@ -164,8 +164,8 @@ export async function runCli(argv, suppliedRankers) {
   const fixture = read(options['--fixture']);
   const normalized = normalizeFixture(fixture.value);
   const rankers = suppliedRankers ?? await import('../lib/automatic-ranking.js');
-  const parameters = validateParameters(options['--parameters'] ? read(options['--parameters']).value : rankers.DEFAULT_PARAMETERS, rankers.DEFAULT_PARAMETERS);
-  const report = {runtimeAlgorithm: 'production baseline; evidence candidate inactive', fixtureSha256: fixture.hash, parameters, parametersSha256: sha256(JSON.stringify(parameters)), corpusCounts: {candidates: normalized.candidates.length, cases: normalized.cases.length}};
+  const parameters = validateParameters(options['--parameters'] ? read(options['--parameters']).value : rankers.AUTOMATIC_PARAMETERS ?? rankers.DEFAULT_PARAMETERS, rankers.DEFAULT_PARAMETERS);
+  const report = {runtimeAlgorithm: 'evidence candidate with fixed AUTOMATIC_PARAMETERS; baseline retained for offline comparison', fixtureSha256: fixture.hash, parameters, parametersSha256: sha256(JSON.stringify(parameters)), corpusCounts: {candidates: normalized.candidates.length, cases: normalized.cases.length}};
   report.sourceSha256 = sha256(fs.readFileSync(new URL('../lib/automatic-ranking.js', import.meta.url)));
   report.frequencyAssetSha256 = sha256(fs.readFileSync(new URL('../lib/data/recall-frequency.json', import.meta.url)));
   if (options['--statistics']) report.statisticsSourceSha256 = sha256(fs.readFileSync(new URL('./recall-statistics.mjs', import.meta.url)));

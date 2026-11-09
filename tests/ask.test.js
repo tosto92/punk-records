@@ -207,10 +207,10 @@ test('automatic eligibility precedes limiting and keeps promoted activity and sy
     summarizeActivity(['deploy.js'], {sessionId: `deploy-${i}`, prompt}), options));
   const promoted = saveMemory(summarizeActivity(['worker.js'], {sessionId: 'worker'}), options);
   assert.equal(isDraft(loadMemories(f.home).memories.find(m => m.memoryId === promoted.memoryId)), true);
-  saveMemory({ref: promoted.memoryId, type: 'solved', title: 'Worker recovery', solution: 'deploy safely'}, options);
+  saveMemory({ref: promoted.memoryId, type: 'solved', title: 'Worker recovery', solution: 'deploy safely; Redis Modbus Kerberos'}, options);
   const memory = loadMemories(f.home).memories.find(m => m.memoryId === promoted.memoryId);
   assert.equal(isDraft(memory), false); assert.ok(memory.tags.includes('auto'));
-  const note = saveMemory({type: 'note', title: 'Useful observation', symptoms: 'deploy times out'}, options);
+  const note = saveMemory({type: 'note', title: 'Useful observation', symptoms: 'deploy times out; Redis Modbus Kerberos'}, options);
   const evidence = path.join(f.root, 'search-evidence.json');
   fs.appendFileSync(f.interpreter, `\nfs.writeFileSync(${JSON.stringify(evidence)}, JSON.stringify(request));\n`);
   const explicit = search({query: 'deploy', limit: 20, resolved: f.resolved});
@@ -219,7 +219,7 @@ test('automatic eligibility precedes limiting and keeps promoted activity and sy
   const scanned = JSON.parse(fs.readFileSync(evidence, 'utf8')).items;
   assert.equal(scanned.length, 6);
   assert.ok(scanned.find(item => item.memoryId === drafts[0].memoryId).texts.some(field => field.text === prompt));
-  const automatic = search({query: 'deploy', limit: 2, resolved: f.resolved, automatic: true});
+  const automatic = search({query: 'Redis Modbus Kerberos', limit: 2, resolved: f.resolved, automatic: true});
   const automaticallyScanned = JSON.parse(fs.readFileSync(evidence, 'utf8')).items;
   assert.deepEqual(new Set(automaticallyScanned.map(item => item.memoryId)), new Set([promoted.memoryId, note.memoryId]));
   assert.deepEqual(new Set(automatic.map(h => h.memoryId)), new Set([promoted.memoryId, note.memoryId]));
@@ -295,7 +295,7 @@ test('full bodies come from the admitted candidate even if event storage changes
 });
 
 
-test('automatic recall ignores conversational words without losing technical or accented queries', t => {
+test('automatic recall ignores conversational and common accented words while preserving technical queries', t => {
   const {resolved} = fixture(t, [
     {title: 'Modbus Redis', symptoms: 'la connessione per il gateway'},
     {title: 'M365 Bitdefender', solution: 'con accesso verificato'},
@@ -309,7 +309,7 @@ test('automatic recall ignores conversational words without losing technical or 
     ['la per con perché anche the and please', []],
     ['Come funziona Modbus con Redis?', ['Modbus Redis']],
     ['Codex', ['Codex hooks']],
-    ['modalita\u0300', ['Autenticazione modalità']],
+    ['modalita\u0300', []],
   ]) assert.deepEqual(search({query, resolved, automatic: true}).map(h => h.title), expected, query);
 });
 
@@ -346,8 +346,10 @@ test('automatic coverage retains unseen words and exact technical or file identi
     {title: 'Recall implementation', files: ['lib/recall.js']},
     {title: 'Codex setup'},
   ]);
-  assert.deepEqual(search({query: 'codex unknownalpha unknownbeta unknowngamma', resolved, automatic: true}), []);
-  assert.deepEqual(search({query: 'deploy', resolved, automatic: true}).map(h => h.title), ['Worker recovery']);
+  assert.deepEqual(search({query: 'codex unknownalpha unknownbeta unknowngamma', resolved, automatic: true}).map(h => h.title), ['Codex setup']);
+  assert.deepEqual(search({query: 'codex E9999', resolved, automatic: true}), []);
+  assert.deepEqual(search({query: 'deploy', resolved, automatic: true}), []);
+  assert.deepEqual(search({query: 'deploy', resolved}).map(h => h.title), ['Worker recovery']);
   assert.deepEqual(search({query: 'lib/recall.js', resolved, automatic: true}).map(h => h.title), ['Recall implementation']);
 });
 
@@ -374,13 +376,14 @@ test('automatic success breaks only equal relevance before timestamp and slug', 
     {title: 'Redis zero', outcome: 'ok', ts: '2026-10-01T00:00:00Z'},
   ]);
   assert.deepEqual(search({query: 'redis', resolved, automatic: true}).map(h => h.title),
-    ['Redis equal', 'Redis zero', 'Redis title', 'File reference']);
+    ['Redis equal', 'Redis zero', 'Redis title']);
+  assert.deepEqual(search({query: 'redis.js', resolved, automatic: true}).map(h => h.title), ['File reference']);
 });
 
 test('automatic rarity excludes blocked and draft candidates before counting corpus frequency', t => {
   const f = securityFixture(t);
   const safe = [
-    {...benign, title: 'Codex', solution: '', symptoms: '', tags: [], files: []},
+    {...benign, title: 'Codex hooks', solution: '', symptoms: '', tags: [], files: []},
     {...benign, memoryId: 'c'.repeat(40), title: 'Other note', solution: '', symptoms: 'hooks', tags: [], files: []},
   ];
   writeSecurityStore(f.home, safe);
@@ -391,7 +394,7 @@ test('automatic rarity excludes blocked and draft candidates before counting cor
     {title: 'Worked on codex', memoryId: 'd'.repeat(40), type: 'note', tags: ['auto'], solution: '', symptoms: 'codex'},
   ]);
   assert.deepEqual(search({query: 'codex hooks', resolved: f.resolved, automatic: true}), before);
-  assert.deepEqual(before.map(h => h.title), ['Codex']);
+  assert.deepEqual(before.map(h => h.title), ['Codex hooks']);
 });
 
 
