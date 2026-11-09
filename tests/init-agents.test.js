@@ -50,6 +50,22 @@ test('synthesis skills and compatibility links resolve for every agent', t => {
   for (const name of ['punk-records-synthesize','brainbrain','brainbrain-synthesize']) assert.equal(fs.realpathSync(path.join(home,'.local','bin',name)),path.join(ROOT,'bin',name));
 });
 
+test('interactive learning skill and Claude entry point install in every scope without replacing foreign files', t => {
+  const {repo,home,root}=sandbox(t);
+  initRepo({cwd:repo});initRepo({cwd:repo,explicit:'global'});
+  const bases=[path.join(repo,'.claude','skills'),path.join(repo,'.agents','skills'),path.join(root,'oc-skills'),path.join(home,'.claude','skills'),path.join(home,'.codex','skills')];
+  for(const base of bases) assert.equal(fs.realpathSync(path.join(base,'punk-records-learn')),path.join(ROOT,'skills','punk-records-learn'));
+  for(const base of [path.join(repo,'.claude','commands'),path.join(home,'.claude','commands')]) assert.equal(fs.realpathSync(path.join(base,'learn.md')),path.join(ROOT,'commands','learn.md'));
+  assert.deepEqual(initRepo({cwd:repo,explicit:'global'}).touched,[]);
+  const foreign=path.join(home,'.codex','skills','punk-records-learn');
+  fs.unlinkSync(foreign);fs.mkdirSync(foreign);fs.writeFileSync(path.join(foreign,'SKILL.md'),'foreign skill');
+  const foreignCommand=path.join(home,'.claude','commands','learn.md');
+  fs.unlinkSync(foreignCommand);fs.writeFileSync(foreignCommand,'foreign command');
+  initRepo({cwd:repo,explicit:'global'});
+  assert.equal(fs.readFileSync(path.join(foreign,'SKILL.md'),'utf8'),'foreign skill');
+  assert.equal(fs.readFileSync(foreignCommand,'utf8'),'foreign command');
+});
+
 for (const name of ['punk-records','previously']) for (const environment of ['env = { PUNK_RECORDS_SYNTHESIS = "1", PUNK_RECORDS_SECURITY = "1", EXTRA = "literal $&" }',`[mcp_servers.${name}.env]\nPUNK_RECORDS_SYNTHESIS = "1"\nPUNK_RECORDS_SECURITY = "1"\nEXTRA = "literal $&"`]) {
   test(`Codex init preserves ${name} managed environment ${environment.startsWith('env') ? 'inline' : 'table'} and custom fields`, t => {
     const {repo} = sandbox(t), config = path.join(repo,'.codex','config.toml');
