@@ -120,6 +120,12 @@ through saving one memory.
 
 Automatic recall conservatively matches topical words, ignores common Italian/English filler, and stays empty when evidence is weak or the prompt is only an operational confirmation. It omits activity drafts and raw native Markdown sources. For broader retrieval, use an explicit `punk-records ask "<query>"` or `memory_find` search; their matching and scores are unchanged. A draft is only an activity summary of recorded edits, not a learned solution. It is not guaranteed for every session: it needs autosave enabled and supported, successfully observed file edits. Investigation-only sessions do not create a meaningful memory automatically; the agent must choose to save a useful finding. After you promote a draft, later automatic captures from that session leave the memory unchanged.
 
+The experimental ranking is enabled for automatic recall. It combines local
+evidence with bundled Italian/English [word-frequency data](docs/recall-frequency.md)
+to reduce matches on common words. Parameters are fixed; they do not automatically
+learn from usage. Contextual ambiguity can still produce irrelevant matches or
+miss useful memories. See [evaluation results and limits](docs/recall-evidence-results.md).
+
 Interrupted `Stop` batches are retained rather than expired. A later `Stop` for
 that session can recover a batch from a stopped process when its recorded checkout
 matches and the session memory is still compatible. Already-saved draft content
@@ -135,6 +141,48 @@ stay in the current checkout. Inner marker projects, nested repositories and sub
 keep their own stores. An unavailable or unsupported primary checkout causes an error;
 repair its Git metadata before saving. Existing worktree-local stores are left untouched
 and are not automatically recovered or merged.
+
+### Learn from project sessions
+
+Invoke the learning skill in your current project and describe the selection:
+
+```text
+# Codex
+$punk-records-learn learn from the last 5 sessions and consolidate with saved memories
+$punk-records-learn learn from sessions with user interactions in the last 48 hours
+$punk-records-learn consolidate findings from the last 7 days, yolo
+
+# Claude plugin (standalone init: /learn)
+/punk-records:learn learn from the last 5 sessions and consolidate with saved memories
+```
+
+The skill includes the project's worktrees and compares findings with existing
+memories, proposing creations, updates, skipped duplicates and held conflicts.
+Time windows use the last user interaction, not transcript modification time.
+It presents one consolidated summary for confirmation before saving. Explicit
+`yolo` skips that confirmation; evidence, scope and conflict checks still apply.
+
+Reasoning uses the active agent by default. You can request another model or
+worker, but the agent must verify that a suitable backend is available; otherwise
+it reports the limitation instead of silently substituting a model. There is no
+built-in model adapter or `learn --model` option. For more control, the lower-level
+CLI takes one transcript and an explicit worker command:
+
+```sh
+# Run from the project whose memories should be compared.
+punk-records learn run --session /absolute/path/session.jsonl --agent codex -- node /absolute/path/text-only-worker.cjs
+punk-records learn review RUN_ID
+```
+
+Use `--agent claude` for Claude transcripts and replace the worker path with your
+own adapter. A chosen provider may receive transcript content and charge for
+usage. The CLI stores private proposals and incremental checkpoints; it does not
+publish memories. Review the proposals, then use the agent or `punk-records save`
+to save or update selected findings. If `caughtUp` is false, run the same command
+again to process the next window. See the [learning guide](docs/deferred-learning.md)
+for the worker protocol, output files and review steps. Multi-session selection
+currently runs through the skill; `learn --last`, `learn --since` and `learn apply`
+are not available CLI commands.
 
 ### From the command line
 
@@ -341,3 +389,7 @@ node scripts/screenshots.mjs  # regenerate docs/images from made-up demo data (n
 
 MIT, see `LICENSE`. The web viewer in `lib/viewer/` is third-party MIT code
 and keeps its own license file.
+
+The bundled word-frequency data in `lib/data/recall-frequency.json` is derived
+from wordfreq and distributed separately under CC BY-SA 4.0. See its
+[attribution and source notices](lib/data/recall-frequency-NOTICE.md).
