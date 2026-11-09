@@ -5,6 +5,10 @@ description: Use when a session fixes a bug, makes a technical decision, finds a
 
 # Punk Records
 
+For explicit learning/consolidation across recent project sessions, use the
+**punk-records-learn** skill. It provides an interactive batch summary and one save
+confirmation by default, with explicit user yolo support.
+
 Cross-session memory for coding agents. Two habits: **recall first**, **save what generalizes**.
 Older memories may call recall a *recap*, a saved memory a *spoiler*, and an
 automatic draft a *cliffhanger*.

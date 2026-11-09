@@ -19,6 +19,13 @@ Optional [incremental synthesis](docs/synthesis.md) combines selected Punk Recor
 
 [Deferred learning](docs/deferred-learning.md) extracts evidence-linked proposals from explicitly selected Claude/Codex transcripts with a worker you choose. `punk-records learn` keeps incremental checkpoints and private review artifacts; proposals stay outside recall until you separately review and save them.
 
+For conversational learning, invoke `/punk-records:learn` through the Claude plugin
+or `$punk-records-learn` in Codex. The dedicated skill handles project-session
+selection, comparison and one confirmation before saving; explicit user yolo skips
+that confirmation. With standalone Claude `init`, the command is `/learn`.
+It uses the active agent and current tools; the proposed standalone batch CLI is
+separate work. See [interactive learning](skills/punk-records-learn/SKILL.md).
+
 ```mermaid
 flowchart LR
   P([Your prompt]) --> R[Recall<br/>matching memories injected]
