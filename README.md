@@ -17,7 +17,7 @@ recalls them when they matter in **Claude Code**, **Codex** and **OpenCode**.
 
 Optional [incremental synthesis](docs/synthesis.md) combines selected Punk Records memories and native Markdown files into reviewed summaries. An agent you choose generates the drafts; its provider may receive the selected content and charge for model usage. Review and publish in the **Synthesis** tab of `punk-records serve`. Summary recall is opt-in; originals stay available.
 
-[Deferred learning](docs/deferred-learning.md) extracts evidence-linked proposals from explicitly selected Claude/Codex transcripts with a worker you choose. `punk-records learn` keeps incremental checkpoints and private review artifacts; proposals stay outside recall until you separately review and save them.
+[Deferred learning](docs/deferred-learning.md) extracts evidence-linked proposals from explicitly selected Claude/Codex transcripts or native OpenCode V1/V2 SQLite sessions with a worker you choose. `punk-records learn` keeps incremental checkpoints and private review artifacts; proposals stay outside recall until you separately review and save them.
 
 For conversational learning, invoke `/punk-records:learn` through the Claude plugin
 or `$punk-records-learn` in Codex. The dedicated skill handles project-session
@@ -154,6 +154,9 @@ $punk-records-learn consolidate findings from the last 7 days, yolo
 
 # Claude plugin (standalone init: /learn)
 /punk-records:learn learn from the last 5 sessions and consolidate with saved memories
+
+# OpenCode (installed skill)
+/punk-records-learn learn from the last 5 project sessions
 ```
 
 The skill includes the project's worktrees and compares findings with existing
@@ -166,11 +169,12 @@ Reasoning uses the active agent by default. You can request another model or
 worker, but the agent must verify that a suitable backend is available; otherwise
 it reports the limitation instead of silently substituting a model. There is no
 built-in model adapter or `learn --model` option. For more control, the lower-level
-CLI takes one transcript and an explicit worker command:
+CLI takes one transcript or exact OpenCode native ID and an explicit worker command:
 
 ```sh
 # Run from the project whose memories should be compared.
 punk-records learn run --session /absolute/path/session.jsonl --agent codex -- node /absolute/path/text-only-worker.cjs
+punk-records learn run --session ses_EXACT_NATIVE_ID --agent opencode --database /absolute/opencode.db -- node /absolute/path/text-only-worker.cjs
 punk-records learn review RUN_ID
 ```
 
@@ -183,6 +187,14 @@ again to process the next window. See the [learning guide](docs/deferred-learnin
 for the worker protocol, output files and review steps. Multi-session selection
 currently runs through the skill; `learn --last`, `learn --since` and `learn apply`
 are not available CLI commands.
+
+OpenCode capture supports the V1 1.19.5 and V2 2.2.6 storage shapes, using the exact
+ID plus database identity. Completed prefixes can be processed while unfinished
+or unsupported tails stay held: `caughtUp` does not imply `sourceComplete`.
+Rewritten consumed native history requires explicit scoped `--reextract` recovery,
+which archives the checkpoint in a new generation and leaves prior runs intact.
+The [V2 acquisition probe](docs/opencode-v2-learning-probe.md) documents the synthetic
+live evidence and its limits; it does not measure learning quality.
 
 ### From the command line
 

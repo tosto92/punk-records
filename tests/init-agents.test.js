@@ -54,7 +54,14 @@ test('interactive learning skill and Claude entry point install in every scope w
   const {repo,home,root}=sandbox(t);
   initRepo({cwd:repo});initRepo({cwd:repo,explicit:'global'});
   const bases=[path.join(repo,'.claude','skills'),path.join(repo,'.agents','skills'),path.join(root,'oc-skills'),path.join(home,'.claude','skills'),path.join(home,'.codex','skills')];
-  for(const base of bases) assert.equal(fs.realpathSync(path.join(base,'punk-records-learn')),path.join(ROOT,'skills','punk-records-learn'));
+  for(const base of bases) {
+    const installed=path.join(base,'punk-records-learn');
+    assert.equal(fs.realpathSync(installed),path.join(ROOT,'skills','punk-records-learn'));
+    const skill=fs.readFileSync(path.join(installed,'SKILL.md'),'utf8');
+    const workflow=skill.match(/\]\((references\/workflow\.md)\)/)?.[1];
+    assert.ok(workflow, 'installed skill must link its acquisition workflow');
+    assert.equal(fs.realpathSync(path.join(installed,workflow)),path.join(ROOT,'skills','punk-records-learn',workflow));
+  }
   for(const base of [path.join(repo,'.claude','commands'),path.join(home,'.claude','commands')]) assert.equal(fs.realpathSync(path.join(base,'learn.md')),path.join(ROOT,'commands','learn.md'));
   assert.deepEqual(initRepo({cwd:repo,explicit:'global'}).touched,[]);
   const foreign=path.join(home,'.codex','skills','punk-records-learn');
@@ -64,6 +71,11 @@ test('interactive learning skill and Claude entry point install in every scope w
   initRepo({cwd:repo,explicit:'global'});
   assert.equal(fs.readFileSync(path.join(foreign,'SKILL.md'),'utf8'),'foreign skill');
   assert.equal(fs.readFileSync(foreignCommand,'utf8'),'foreign command');
+  const foreignOpenCode=path.join(root,'oc-skills','punk-records-learn');
+  fs.unlinkSync(foreignOpenCode);fs.mkdirSync(foreignOpenCode);
+  fs.writeFileSync(path.join(foreignOpenCode,'SKILL.md'),'foreign OpenCode skill');
+  initRepo({cwd:repo,explicit:'global',agents:['opencode']});
+  assert.equal(fs.readFileSync(path.join(foreignOpenCode,'SKILL.md'),'utf8'),'foreign OpenCode skill');
 });
 
 for (const name of ['punk-records','previously']) for (const environment of ['env = { PUNK_RECORDS_SYNTHESIS = "1", PUNK_RECORDS_SECURITY = "1", EXTRA = "literal $&" }',`[mcp_servers.${name}.env]\nPUNK_RECORDS_SYNTHESIS = "1"\nPUNK_RECORDS_SECURITY = "1"\nEXTRA = "literal $&"`]) {

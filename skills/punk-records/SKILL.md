@@ -7,7 +7,8 @@ description: Use when a session fixes a bug, makes a technical decision, finds a
 
 For explicit learning/consolidation across recent project sessions, use the
 **punk-records-learn** skill. It provides an interactive batch summary and one save
-confirmation by default, with explicit user yolo support.
+confirmation by default, with explicit user yolo support. It reads OpenCode V1/V2
+SQLite sessions as well as Claude/Codex transcripts, regardless of the active agent.
 
 Cross-session memory for coding agents. Two habits: **recall first**, **save what generalizes**.
 Older memories may call recall a *recap*, a saved memory a *spoiler*, and an
