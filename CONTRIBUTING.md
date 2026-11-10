@@ -13,7 +13,8 @@ Thanks for helping. Ground rules:
   Live agent smoke tests run when `CLAUDE_BIN` / `CODEX_BIN` (and the OpenCode
   variables in `tests/opencode-smoke.test.js`) point at real binaries.
 - **Agent behaviour is verified, not assumed.** When a change relies on how
-  Claude Code, Codex or OpenCode behave, record what you checked and the version
-  in `docs/`.
+  Claude Code, Codex or OpenCode behave, update the operational compatibility
+  guidance when its contract changes. Keep plans, investigations and execution
+  reports outside tracked files.
 
 Keep pull requests small and focused; describe how you tested them.
