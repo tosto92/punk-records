@@ -128,6 +128,7 @@ for (const [label, variable, api, installation] of matrix) {
     mutate(database, `UPDATE ${api === 'v1' ? 'session' : 'session_v2'} SET directory=?`, [cwd]);
     const installed = path.join(configDir, 'skills', 'punk-records-learn');
     const captureScript = path.join(root, 'capture.mjs'), snapshot = path.join(root, 'capture.json');
+    const recheckReceipt = path.join(root, 'recheck.json');
     fs.writeFileSync(captureScript, `import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {captureOpenCodeSession} from ${JSON.stringify(new URL('../lib/opencode-learning.js', import.meta.url).href)};
@@ -139,7 +140,10 @@ assert.equal(capture.descriptor.directory,${JSON.stringify(cwd)});
 assert.equal(capture.coverage.sourceComplete,true);
 assert.ok(window.records.some(record=>record.role==='assistant' && record.locator));
 const file=${JSON.stringify(snapshot)};
-if(process.argv.includes('--recheck')) assert.equal(capture.sourceRevision,JSON.parse(fs.readFileSync(file)).sourceRevision);
+if(process.argv.includes('--recheck')) {
+  assert.equal(capture.sourceRevision,JSON.parse(fs.readFileSync(file)).sourceRevision);
+  fs.writeFileSync(${JSON.stringify(recheckReceipt)},JSON.stringify({sourceRevision:capture.sourceRevision}),{mode:0o600});
+}
 else fs.writeFileSync(file,JSON.stringify({...capture,bytes:undefined,window}),{mode:0o600});
 console.log(JSON.stringify({...capture,bytes:undefined,window}));
 `);
@@ -156,7 +160,9 @@ console.log(JSON.stringify({...capture,bytes:undefined,window}));
     };
     const cli = args => ['node', path.resolve(import.meta.dirname, '../bin/punk-records'), ...args]
       .map(value => "'" + value.replaceAll("'", "'\\''") + "'").join(' ');
+    let saveCalls = 0;
     const memoryTool = (name, args) => body => {
+      if (name === 'memory_save') saveCalls++;
       if (body.tools?.some(tool => tool.function?.name.endsWith(name))) return tool(name, args)(body);
       t.diagnostic(`direct ${name} absent from provider tool list; CLI fallback exercised`);
       return shell(cli(name === 'memory_find' ? ['ask', args.query, '--full']
@@ -168,8 +174,8 @@ console.log(JSON.stringify({...capture,bytes:undefined,window}));
       assert.equal(steps.length, 0, output.slice(-4000));
       return output;
     };
-    for (const yolo of [false, true]) {
-      const title = `Native learning ${yolo ? 'yolo' : 'confirmed'}`;
+    for (const {yolo, changed} of [{yolo: false}, {yolo: true}, {yolo: true, changed: true}]) {
+      const title = `Native learning ${changed ? 'changed' : yolo ? 'yolo' : 'confirmed'}`;
       steps = [tool('skill', {[api === 'v1' ? 'name' : 'id']: 'punk-records-learn'}),
         body => {
           const loaded = JSON.stringify(body.messages.filter(message => message.role === 'tool').at(-1));
@@ -180,17 +186,32 @@ console.log(JSON.stringify({...capture,bytes:undefined,window}));
           assert.ok(JSON.stringify(body.messages).includes('captureOpenCodeSession'), 'actual workflow must expose native capture contract');
           return shell(`node '${captureScript}'`)(body);
         }, memoryTool('memory_find', {query: title, full: true})];
-      const saveSteps = [shell(`node '${captureScript}' --recheck`), body => {
+      const saveSteps = [body => {
+        fs.rmSync(recheckReceipt, {force: true});
+        if (changed) mutate(database, `UPDATE ${api === 'v1' ? 'session' : 'session_v2'} SET time_updated=time_updated+1 WHERE id=?`, ['selected']);
+        return shell(`node '${captureScript}' --recheck`)(body);
+      }, body => {
         const capture = JSON.parse(fs.readFileSync(snapshot));
-        assert.ok(JSON.stringify(body.messages.filter(message => message.role === 'tool').at(-1)).includes(capture.sourceRevision), 'native revision recheck must succeed before save');
+        if (!fs.existsSync(recheckReceipt)) {
+          steps = [];
+          return text('LEARNING_HELD')();
+        }
+        assert.deepEqual(JSON.parse(fs.readFileSync(recheckReceipt)), {sourceRevision: capture.sourceRevision}, 'native revision recheck must succeed before save');
         const record = capture.window.records.find(record => record.role === 'assistant');
         return memoryTool('memory_save', {type: 'note', title, scope: 'local',
           solution: `${record.text}\nNative evidence: ${JSON.stringify(record.locator)}; database=${capture.descriptor.database}; session=selected; revision=${capture.sourceRevision}; sourceComplete=${capture.coverage.sourceComplete}. Synthetic historical result; deployment unverified.`})(body);
       }, text('LEARNING_SAVED')];
       const before = loadMemories(path.join(cwd, 'memory')).memories.length;
+      const beforeSaveCalls = saveCalls;
       if (yolo) steps.push(...saveSteps);
       else steps.push(text('Selected 1; processed 1; held 0; duplicates 0; saved 0. Create 1 native finding. Save this plan?'));
       const learned = await launch(`Use punk-records-learn to learn selected native source in ${database}${yolo ? ', yolo' : ''}`);
+      if (changed) {
+        assert.equal(saveCalls, beforeSaveCalls, 'failed native recheck must not issue any save');
+        assert.equal(loadMemories(path.join(cwd, 'memory')).memories.length, before, 'failed native recheck must leave memory unchanged');
+        assert.match(learned, /LEARNING_HELD/);
+        continue;
+      }
       if (!yolo) {
         assert.equal(learned.match(/Save this plan\?/g)?.length, 1, 'one consolidated confirmation');
         assert.equal(loadMemories(path.join(cwd, 'memory')).memories.length, before, 'no save before approval');
@@ -208,6 +229,6 @@ console.log(JSON.stringify({...capture,bytes:undefined,window}));
       assert.ok(finding?.memoryId);
       assert.match(finding.solution, /Native evidence:.*revision=.*deployment unverified/);
     }
-    t.diagnostic('installed skill/workflow, native capture/revision recheck, admitted search, default approval/resume and yolo local save receipts verified with scripted provider');
+    t.diagnostic('installed skill/workflow, native capture/revision receipt, admitted search, default approval/resume and yolo local saves verified; changed source held with no save call');
   });
 }
