@@ -1,0 +1,556 @@
+{
+  "messages": [
+    {
+      "data": {
+        "files": [],
+        "text": "This is a synthetic storage-format test. Work only in /probe/project. Read settings.txt. Run `test -f intentionally-missing.txt` once so we capture a real failed tool result; do not hide or retry that expected failure. Change retry_limit from 2 to 3, then read the file to verify. Report the observed failure and verified new setting. End with SYNTHETIC_FIX_A. Do not use the network or create agents.\n",
+        "time": {
+          "created": 1794245568112
+        }
+      },
+      "id": "msg_1c15ea5d7001kw74YVv7xUATaB",
+      "seq": 5,
+      "session_id": "selected",
+      "time_created": 1794245568112,
+      "time_updated": 1794245568113,
+      "type": "user"
+    },
+    {
+      "data": {
+        "agent": "build",
+        "content": [
+          {
+            "native": {
+              "reasoningField": "reasoning_content"
+            },
+            "text": "REASONING_SENTINEL",
+            "time": {
+              "completed": 1794245571059,
+              "created": 1794245570633
+            },
+            "type": "reasoning"
+          },
+          {
+            "text": "I'll start by reading the settings file and running the expected-failure command in parallel.",
+            "type": "text"
+          },
+          {
+            "executed": false,
+            "id": "chatcmpl-tool-984ee8c0b2853f19",
+            "name": "read",
+            "state": {
+              "content": [
+                {
+                  "text": "Read file /probe/project/settings.txt, lines 1-1\n1: retry_limit=2",
+                  "type": "text"
+                }
+              ],
+              "input": {
+                "path": "/probe/project/settings.txt"
+              },
+              "metadata": {
+                "truncated": false
+              },
+              "status": "completed"
+            },
+            "time": {
+              "completed": 1794245571102,
+              "created": 1794245570897,
+              "ran": 1794245571065
+            },
+            "type": "tool"
+          },
+          {
+            "executed": false,
+            "id": "chatcmpl-tool-a9aade6cef8f5284",
+            "name": "shell",
+            "state": {
+              "content": [
+                {
+                  "text": "(no output)",
+                  "type": "text"
+                },
+                {
+                  "text": "Exited with code 1",
+                  "type": "text"
+                }
+              ],
+              "input": {
+                "command": "test -f intentionally-missing.txt",
+                "workdir": "/probe/project"
+              },
+              "metadata": {
+                "exit": 1,
+                "status": "completed",
+                "truncated": false
+              },
+              "status": "completed"
+            },
+            "time": {
+              "completed": 1794245571098,
+              "created": 1794245570904,
+              "ran": 1794245571069
+            },
+            "type": "tool"
+          }
+        ],
+        "cost": 0,
+        "finish": "tool-calls",
+        "model": {
+          "id": "glm-5.3-flash-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "rawFinish": "tool_calls",
+        "time": {
+          "completed": 1794245571105,
+          "created": 1794245568133,
+          "streamed": 1794245571081
+        },
+        "tokens": {
+          "cache": {
+            "read": 4736,
+            "write": 0
+          },
+          "input": 445,
+          "output": 57,
+          "reasoning": 150
+        }
+      },
+      "id": "msg_1c15ea67e001ojnM061fy9Fjzf",
+      "seq": 6,
+      "session_id": "selected",
+      "time_created": 1794245568133,
+      "time_updated": 1794245571107,
+      "type": "assistant"
+    },
+    {
+      "data": {
+        "agent": "build",
+        "content": [
+          {
+            "native": {
+              "reasoningField": "reasoning_content"
+            },
+            "text": "REASONING_SENTINEL",
+            "time": {
+              "completed": 1794245573109,
+              "created": 1794245572312
+            },
+            "type": "reasoning"
+          },
+          {
+            "text": "Both completed. Now I'll make the edit, then verify by reading the file.",
+            "type": "text"
+          },
+          {
+            "executed": false,
+            "id": "chatcmpl-tool-88afdffc47657d89",
+            "name": "edit",
+            "state": {
+              "content": [
+                {
+                  "text": "Edited settings.txt (1 replacement)",
+                  "type": "text"
+                }
+              ],
+              "input": {
+                "newString": "retry_limit=3",
+                "oldString": "retry_limit=2",
+                "path": "/probe/project/settings.txt"
+              },
+              "metadata": {
+                "files": [
+                  {
+                    "additions": 1,
+                    "deletions": 1,
+                    "file": "settings.txt",
+                    "patch": "Index: settings.txt\n===================================================================\n--- settings.txt\n+++ settings.txt\n@@ -1,1 +1,1 @@\n-retry_limit=2\n+retry_limit=3\n",
+                    "status": "modified"
+                  }
+                ],
+                "truncated": false
+              },
+              "status": "completed"
+            },
+            "time": {
+              "completed": 1794245573129,
+              "created": 1794245572944,
+              "ran": 1794245573115
+            },
+            "type": "tool"
+          }
+        ],
+        "cost": 0,
+        "finish": "tool-calls",
+        "model": {
+          "id": "glm-5.3-flash-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "rawFinish": "tool_calls",
+        "time": {
+          "completed": 1794245573133,
+          "created": 1794245571124,
+          "streamed": 1794245573120
+        },
+        "tokens": {
+          "cache": {
+            "read": 5180,
+            "write": 0
+          },
+          "input": 242,
+          "output": 52,
+          "reasoning": 96
+        }
+      },
+      "id": "msg_1c15eb22c001AtQqwbYiXXjh2O",
+      "seq": 21,
+      "session_id": "selected",
+      "time_created": 1794245571124,
+      "time_updated": 1794245573135,
+      "type": "assistant"
+    },
+    {
+      "data": {
+        "agent": "build",
+        "content": [
+          {
+            "executed": false,
+            "id": "chatcmpl-tool-b84bc08d171d0383",
+            "name": "read",
+            "state": {
+              "content": [
+                {
+                  "text": "Read file /probe/project/settings.txt, lines 1-1\n1: retry_limit=3",
+                  "type": "text"
+                }
+              ],
+              "input": {
+                "path": "/probe/project/settings.txt"
+              },
+              "metadata": {
+                "truncated": false
+              },
+              "status": "completed"
+            },
+            "time": {
+              "completed": 1794245574803,
+              "created": 1794245574703,
+              "ran": 1794245574790
+            },
+            "type": "tool"
+          }
+        ],
+        "cost": 0,
+        "finish": "tool-calls",
+        "model": {
+          "id": "glm-5.3-flash-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "rawFinish": "tool_calls",
+        "time": {
+          "completed": 1794245574808,
+          "created": 1794245573152,
+          "streamed": 1794245574793
+        },
+        "tokens": {
+          "cache": {
+            "read": 5376,
+            "write": 0
+          },
+          "input": 205,
+          "output": 15,
+          "reasoning": 0
+        }
+      },
+      "id": "msg_1c15eba1a001CefjBTV71NJHs4",
+      "seq": 32,
+      "session_id": "selected",
+      "time_created": 1794245573152,
+      "time_updated": 1794245574811,
+      "type": "assistant"
+    },
+    {
+      "data": {
+        "agent": "build",
+        "content": [
+          {
+            "native": {
+              "reasoningField": "reasoning_content"
+            },
+            "text": "REASONING_SENTINEL",
+            "time": {
+              "completed": 1794245577618,
+              "created": 1794245576192
+            },
+            "type": "reasoning"
+          },
+          {
+            "text": "Done. Summary of what happened:\n\n**Observed failure (expected, captured once, not retried):**\n- Command: `test -f intentionally-missing.txt` in `/probe/project`\n- Result: exited with code 1 — the file `intentionally-missing.txt` does not exist, so the test failed as anticipated. This genuine failed tool result was recorded and left as-is.\n\n**Verified new setting:**\n- `/probe/project/settings.txt` originally contained `retry_limit=2`\n- Applied the edit (`retry_limit=2` → `retry_limit=3`, 1 replacement)\n- Re-read the file to confirm: line 1 now reads `retry_limit=3`\n\nAll work was confined to `/probe/project`; no network access and no agents were used.\n\nSYNTHETIC_FIX_A",
+            "type": "text"
+          }
+        ],
+        "cost": 0,
+        "finish": "stop",
+        "model": {
+          "id": "glm-5.3-flash-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "rawFinish": "stop",
+        "time": {
+          "completed": 1794245577628,
+          "created": 1794245574834,
+          "streamed": 1794245577625
+        },
+        "tokens": {
+          "cache": {
+            "read": 5580,
+            "write": 0
+          },
+          "input": 40,
+          "output": 169,
+          "reasoning": 103
+        }
+      },
+      "id": "msg_1c15ec0a9001zGYYoPyjQJUq95",
+      "seq": 39,
+      "session_id": "selected",
+      "time_created": 1794245574834,
+      "time_updated": 1794245577630,
+      "type": "assistant"
+    },
+    {
+      "data": {
+        "outcome": "succeeded",
+        "time": {
+          "created": 1794245577634
+        }
+      },
+      "id": "msg_1c15ecba20014Slxd0C5RBSWRF",
+      "seq": 46,
+      "session_id": "selected",
+      "time_created": 1794245577634,
+      "time_updated": 1794245577635,
+      "type": "idle"
+    },
+    {
+      "data": {
+        "files": [],
+        "text": "Correction to the previous requirement: retry_limit must be 4, not 3. Update settings.txt and read it back. State that the earlier value 3 is superseded, and end with SYNTHETIC_FIX_B. Work only in /probe/project, with no network or subagents.\n",
+        "time": {
+          "created": 1794245614005
+        }
+      },
+      "id": "msg_1c15f5549001dvth3oW9CZRVbx",
+      "seq": 49,
+      "session_id": "selected",
+      "time_created": 1794245614005,
+      "time_updated": 1794245614006,
+      "type": "user"
+    },
+    {
+      "data": {
+        "agent": "build",
+        "content": [
+          {
+            "native": {
+              "reasoningField": "reasoning_content"
+            },
+            "text": "REASONING_SENTINEL",
+            "time": {
+              "completed": 1794245616777,
+              "created": 1794245615778
+            },
+            "type": "reasoning"
+          },
+          {
+            "text": "Updating the value now, then reading back to verify.",
+            "type": "text"
+          },
+          {
+            "executed": false,
+            "id": "chatcmpl-tool-a41df8dcac320352",
+            "name": "edit",
+            "state": {
+              "content": [
+                {
+                  "text": "Edited settings.txt (1 replacement)",
+                  "type": "text"
+                }
+              ],
+              "input": {
+                "newString": "retry_limit=4",
+                "oldString": "retry_limit=3",
+                "path": "/probe/project/settings.txt"
+              },
+              "metadata": {
+                "files": [
+                  {
+                    "additions": 1,
+                    "deletions": 1,
+                    "file": "settings.txt",
+                    "patch": "Index: settings.txt\n===================================================================\n--- settings.txt\n+++ settings.txt\n@@ -1,1 +1,1 @@\n-retry_limit=3\n+retry_limit=4\n",
+                    "status": "modified"
+                  }
+                ],
+                "truncated": false
+              },
+              "status": "completed"
+            },
+            "time": {
+              "completed": 1794245616799,
+              "created": 1794245616712,
+              "ran": 1794245616784
+            },
+            "type": "tool"
+          }
+        ],
+        "cost": 0,
+        "finish": "tool-calls",
+        "model": {
+          "id": "glm-5.3-flash-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "rawFinish": "tool_calls",
+        "time": {
+          "completed": 1794245616803,
+          "created": 1794245614031,
+          "streamed": 1794245616789
+        },
+        "tokens": {
+          "cache": {
+            "read": 5580,
+            "write": 0
+          },
+          "input": 374,
+          "output": 46,
+          "reasoning": 62
+        }
+      },
+      "id": "msg_1c15f59c80011Hd0IYLP4b9qzY",
+      "seq": 50,
+      "session_id": "selected",
+      "time_created": 1794245614031,
+      "time_updated": 1794245616806,
+      "type": "assistant"
+    },
+    {
+      "data": {
+        "agent": "build",
+        "content": [
+          {
+            "executed": false,
+            "id": "chatcmpl-tool-9c178fb3cea8443f",
+            "name": "read",
+            "state": {
+              "content": [
+                {
+                  "text": "Read file /probe/project/settings.txt, lines 1-1\n1: retry_limit=4",
+                  "type": "text"
+                }
+              ],
+              "input": {
+                "path": "/probe/project/settings.txt"
+              },
+              "metadata": {
+                "truncated": false
+              },
+              "status": "completed"
+            },
+            "time": {
+              "completed": 1794245618248,
+              "created": 1794245618110,
+              "ran": 1794245618234
+            },
+            "type": "tool"
+          }
+        ],
+        "cost": 0,
+        "finish": "tool-calls",
+        "model": {
+          "id": "glm-5.3-flash-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "rawFinish": "tool_calls",
+        "time": {
+          "completed": 1794245618252,
+          "created": 1794245616824,
+          "streamed": 1794245618239
+        },
+        "tokens": {
+          "cache": {
+            "read": 5952,
+            "write": 0
+          },
+          "input": 121,
+          "output": 15,
+          "reasoning": 0
+        }
+      },
+      "id": "msg_1c15f64b20011tQuQwvB9WTP28",
+      "seq": 61,
+      "session_id": "selected",
+      "time_created": 1794245616824,
+      "time_updated": 1794245618254,
+      "type": "assistant"
+    },
+    {
+      "data": {
+        "agent": "build",
+        "content": [
+          {
+            "text": "Done. Summary:\n\n- **Correction applied:** `/probe/project/settings.txt` now contains `retry_limit=4` (edit made 1 replacement).\n- **Superseded value:** The earlier value `3` from the previous step is superseded per your correction — `4` is the authoritative setting now.\n- **Verification:** Re-read the file; line 1 reads `retry_limit=4`.\n\nWork was confined to `/probe/project`, with no network access and no subagents.\n\nSYNTHETIC_FIX_B",
+            "type": "text"
+          }
+        ],
+        "cost": 0,
+        "finish": "stop",
+        "model": {
+          "id": "glm-5.3-flash-free",
+          "providerID": "opencode",
+          "variant": "default"
+        },
+        "rawFinish": "stop",
+        "time": {
+          "completed": 1794245620131,
+          "created": 1794245618275,
+          "streamed": 1794245620128
+        },
+        "tokens": {
+          "cache": {
+            "read": 6072,
+            "write": 0
+          },
+          "input": 40,
+          "output": 108,
+          "reasoning": 0
+        }
+      },
+      "id": "msg_1c15f6a5c001Ck19jz5xbhIX8S",
+      "seq": 68,
+      "session_id": "selected",
+      "time_created": 1794245618275,
+      "time_updated": 1794245620132,
+      "type": "assistant"
+    },
+    {
+      "data": {
+        "outcome": "succeeded",
+        "time": {
+          "created": 1794245620135
+        }
+      },
+      "id": "msg_1c15f71a7001FRevlpKnchZFim",
+      "seq": 73,
+      "session_id": "selected",
+      "time_created": 1794245620135,
+      "time_updated": 1794245620136,
+      "type": "idle"
+    }
+  ]
+}
