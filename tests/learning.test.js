@@ -259,3 +259,30 @@ test('OpenCode V1 runner preserves native part evidence and operator scope', asy
   const q=read(a.paths.request);assert.equal(q.scope,'global');assert.equal(q.sourceDescriptor.storageFormat,'opencode-v1');
   assert.equal(a.proposals[0].evidence[0].locator.partId,'1-0');assert.equal(a.proposals[0].evidence[0].finish,'stop');
 });
+
+
+test('OpenCode oversized title with empty or held projection keeps checkpoints readable', async t => {
+  for (const messages of [[],[user('unfinished')]]) {
+    const f=native(t,messages);
+    mutate(f.database,"UPDATE session_v2 SET title=replace(hex(zeroblob(270000)),'00','x') WHERE id='selected'");
+    const a=await learning.runLearningJob(f);assert.equal(a.status,'noop',a.errors.join());
+    const state=checkpoint(f);assert.ok(fs.statSync(state).size<=256*1024,'checkpoint fits its read bound');
+    const descriptor=read(state).sourceDescriptor;assert.equal(Object.hasOwn(descriptor,'title'),false);assert.equal(Object.hasOwn(descriptor,'directory'),false);
+    assert.equal(descriptor.sessionId,'selected');assert.equal(descriptor.parentId,null);assert.equal(descriptor.forkSessionId,null);assert.equal(descriptor.forkBoundary,null);assert.equal(descriptor.revert,false);
+    assert.equal((await learning.runLearningJob(f)).status,'noop');
+    assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'noop');
+  }
+});
+
+test('OpenCode oversized checkpoint lineage fails before replacing or archiving active state', async t => {
+  const f=native(t,[]);assert.equal((await learning.runLearningJob(f)).status,'noop');
+  const state=checkpoint(f),old=fs.readFileSync(state);
+  mutate(f.database,"UPDATE session_v2 SET parent_id=replace(hex(zeroblob(270000)),'00','x') WHERE id='selected'");
+  for (const reextract of [false,true]) {
+    const r=await learning.runLearningJob({...f,reextract});assert.equal(r.status,'error');assert.match(r.errors.join(),/checkpoint exceeds/);
+    assert.deepEqual(fs.readFileSync(state),old);assert.equal(fs.existsSync(path.join(f.store,'learning','generations')),false);
+  }
+  mutate(f.database,"UPDATE session_v2 SET parent_id=NULL WHERE id='selected'");
+  assert.equal((await learning.runLearningJob(f)).status,'noop');
+  assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'noop');
+});
