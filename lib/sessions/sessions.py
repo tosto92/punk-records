@@ -13,9 +13,13 @@ Every run syncs incrementally from ~/.claude, ~/.codex and OpenCode's opencode.d
 first (CLAUDE_CONFIG_DIR, CODEX_HOME and XDG_DATA_HOME are honoured).
 Read-only: agent files are never modified.
 """
-import glob, json, os, re, shlex, sqlite3, sys, time
-from collections import defaultdict
+import glob, importlib.util, json, os, re, shlex, sqlite3, sys, time
 from pathlib import Path
+
+# Resolve the trusted sibling even when sessions is imported by file path.
+_reader_spec = importlib.util.spec_from_file_location("opencode_learning", Path(__file__).with_name("opencode_learning.py"))
+_reader = importlib.util.module_from_spec(_reader_spec)
+_reader_spec.loader.exec_module(_reader)
 
 H = Path.home()
 CLAUDE = Path(os.environ.get("CLAUDE_CONFIG_DIR") or H / ".claude")
@@ -26,7 +30,7 @@ DB = Path(os.environ.get("PUNK_RECORDS_HOME") or H / ".local/share/punk-records"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions(
   id TEXT PRIMARY KEY, tool TEXT, cwd TEXT, project TEXT, branch TEXT, title TEXT,
-  file TEXT, file_mtime REAL);
+  file TEXT, file_mtime REAL, source_format TEXT);
 CREATE TABLE IF NOT EXISTS prompts(
   session_id TEXT, ts REAL, text TEXT, UNIQUE(session_id, ts, text));
 CREATE INDEX IF NOT EXISTS prompts_ts ON prompts(ts);
@@ -105,29 +109,26 @@ def sync(db):
 def sync_opencode(db):
     if not OPENCODE.is_file():
         return
-    source = sqlite3.connect(OPENCODE.resolve().as_uri() + "?mode=ro", uri=True)
+    source = sqlite3.connect(OPENCODE.resolve().as_uri() + "?mode=ro", uri=True, timeout=2)
     try:
-        known = dict(db.execute("SELECT id, file_mtime FROM sessions WHERE tool='opencode'"))
-        for sid, cwd, title, updated in source.execute("SELECT id, directory, title, time_updated FROM session"):
-            if known.get(sid) == updated:
+        source.execute("PRAGMA query_only=ON")
+        source.execute("BEGIN")
+        known = {sid: (mtime, fmt) for sid, mtime, fmt in db.execute(
+            "SELECT id, file_mtime, source_format FROM sessions WHERE tool='opencode'")}
+        for desc in _reader.native_sessions(source):
+            sid, cwd = desc['sessionId'], desc['directory']
+            updated, fmt = desc['updatedAt'], desc['storageFormat']
+            if known.get(sid) == (updated, fmt):
                 continue
-            db.execute("""INSERT INTO sessions(id,tool,cwd,project,title,file,file_mtime) VALUES(?,?,?,?,?,?,?)
+            prompts = list(_reader.native_prompts(source, desc))
+            db.execute("""INSERT INTO sessions(id,tool,cwd,project,title,file,file_mtime,source_format) VALUES(?,?,?,?,?,?,?,?)
                        ON CONFLICT(id) DO UPDATE SET cwd=excluded.cwd, project=excluded.project,
-                       title=excluded.title, file=excluded.file, file_mtime=excluded.file_mtime""",
-                       (sid, "opencode", cwd, project_of(cwd), title, str(OPENCODE), updated))
-            prompts = defaultdict(list)
-            for mid, ts, message, part in source.execute("""SELECT m.id, m.time_created, m.data, p.data
-                    FROM message m JOIN part p ON p.message_id=m.id
-                    WHERE m.session_id=? ORDER BY m.time_created, p.id""", (sid,)):
-                message, part = json.loads(message), json.loads(part)
-                if message.get("role") != "user" or part.get("type") != "text" or part.get("synthetic") or part.get("ignored"):
-                    continue
-                text = (part.get("text") or "").strip()
-                if text and not text.startswith("/"):
-                    prompts[(mid, ts)].append(text)
+                       title=excluded.title, file=excluded.file, file_mtime=excluded.file_mtime,
+                       source_format=excluded.source_format""",
+                       (sid, "opencode", cwd, project_of(cwd), desc['title'], str(OPENCODE), updated, fmt))
             db.execute("DELETE FROM prompts WHERE session_id=?", (sid,))
             db.executemany("INSERT OR IGNORE INTO prompts VALUES(?,?,?)",
-                           ((sid, ts / 1000, "\n".join(parts)) for (_, ts), parts in prompts.items()))
+                           ((sid, p['ts'], p['text']) for p in prompts))
     finally:
         source.close()
 
@@ -245,6 +246,8 @@ def open_db():
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
     db.executescript(SCHEMA)
+    if "source_format" not in {r[1] for r in db.execute("PRAGMA table_info(sessions)")}:
+        db.execute("ALTER TABLE sessions ADD COLUMN source_format TEXT")
     sync(db)
     return db
 

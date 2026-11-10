@@ -5,6 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
+import {fixture, python, mutate, user, assistant} from './fixtures/learning/opencode.js';
+
 const CLI = path.resolve(import.meta.dirname, '../bin/punk-records');
 const hasPython = spawnSync('python3', ['--version']).status === 0;
 
@@ -155,4 +157,115 @@ assert m.project_rows(db, '')[0]['last']['id'] == 'other'
 assert m.project_rows(db, '')[0]['days'] == 2
 `], {cwd: path.dirname(path.dirname(CLI)), encoding: 'utf8'});
   assert.equal(res.status, 0, res.stderr);
+});
+
+test('sessions discovers V2 visible interactions, searches intermediate prompts and refreshes corrections', {skip: !hasPython && 'python3 not found'}, t => {
+  const source = fixture(t, 2, [user('first request'), assistant(), user('needle intermediate'),
+    {...user('hidden synthetic'), data:{text:'hidden synthetic', synthetic:true}},
+    {...user('hidden ignored'), data:{text:'hidden ignored', ignored:true}}, user('/clear'), user('last request')]);
+  const home = path.dirname(source);
+  fs.mkdirSync(path.join(home, 'opencode'));
+  fs.renameSync(source, path.join(home, 'opencode/opencode.db'));
+  const database = path.join(home, 'opencode/opencode.db');
+  mutate(database, "UPDATE session_v2 SET directory='/p/demo/.worktrees/fix' WHERE id='selected'");
+  const env = {...process.env, HOME:home, XDG_DATA_HOME:home, PUNK_RECORDS_HOME:path.join(home,'store'), CLAUDE_CONFIG_DIR:'', CODEX_HOME:''};
+  const run = args => {
+    const result = spawnSync(process.execPath, [CLI,'sessions',...args], {env,encoding:'utf8'});
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(result.stdout);
+  };
+  const first = run(['api','/api/session','id=selected']);
+  assert.equal(first.session?.tool, 'opencode');
+  assert.equal(first.session.project, '/p/demo');
+  assert.equal(first.session.resume, 'cd /p/demo/.worktrees/fix && opencode --session selected');
+  assert.deepEqual(first.prompts.map(p=>p.text), ['first request','needle intermediate','last request']);
+  assert.deepEqual(first.prompts.map(p=>p.ts), [1,1.002,1.006]);
+  assert.deepEqual(run(['api','/api/session','id=selected']), first);
+  assert.equal(run(['api','/api/data','q=needle&days=36500']).projects[0].last.id, 'selected');
+  mutate(database, "UPDATE session_message SET data=? WHERE id='2'", [JSON.stringify(user('corrected request').data)]);
+  mutate(database, 'UPDATE session_v2 SET time_updated=time_updated+1000');
+  const corrected = run(['api','/api/session','id=selected']);
+  assert.deepEqual(corrected.prompts.map(p=>p.text), ['first request','corrected request','last request']);
+  assert.equal(run(['api','/api/data','q=needle&days=36500']).projects.length, 0);
+});
+
+test('sessions upgrades old caches once and prefers migrated V2 at equal native update time', {skip: !hasPython && 'python3 not found'}, t => {
+  const source = fixture(t, 1, [{data:{role:'user'}, parts:[{type:'text',text:'legacy prompt'}]}]);
+  const cache = path.join(path.dirname(source), 'sessions.db');
+  python(`import importlib.util,sqlite3,sys,pathlib
+spec=importlib.util.spec_from_file_location('sessions','lib/sessions/sessions.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.DB=pathlib.Path(sys.argv[2]);m.OPENCODE=pathlib.Path(sys.argv[1])
+m.CLAUDE=m.CODEX=pathlib.Path(sys.argv[2]+'.absent')
+c=sqlite3.connect(m.DB)
+c.executescript(m.SCHEMA.replace(', source_format TEXT',''))
+for sid,tool in [('claude-old','claude'),('codex-old','codex'),('selected','opencode')]:
+ c.execute('INSERT INTO sessions(id,tool,cwd,project,file_mtime) VALUES(?,?,?,?,?)',(sid,tool,'/old','/old',1000))
+ c.execute('INSERT INTO prompts VALUES(?,?,?)',(sid,1,'cached '+sid))
+c.commit();c.close()
+original=m._reader.native_sessions
+def checked(connection):
+ assert connection.in_transaction
+ assert connection.execute('PRAGMA query_only').fetchone()[0]==1
+ yield from original(connection)
+m._reader.native_sessions=checked
+d=m.open_db()
+assert [r['text'] for r in m.session_prompts(d,'selected')[1]]==['legacy prompt'], 'null-format row must refresh'
+assert d.execute("SELECT source_format FROM sessions WHERE id='selected'").fetchone()[0]=='opencode-v1'
+for sid in ['claude-old','codex-old']:
+ assert m.session_prompts(d,sid)[1][0]['text']=='cached '+sid
+d.close()
+s=sqlite3.connect(m.OPENCODE)
+s.executescript('CREATE TABLE session_v2(id TEXT PRIMARY KEY,directory TEXT,title TEXT,time_updated INTEGER); CREATE TABLE session_message(id TEXT PRIMARY KEY,session_id TEXT,type TEXT,seq INTEGER,time_created INTEGER,data TEXT); CREATE TABLE session_part(message_id TEXT,session_id TEXT,ordinal INTEGER,type TEXT,call_id TEXT,data TEXT);')
+s.execute("INSERT INTO session_v2 VALUES('selected','/new','V2 title',1000)")
+s.execute("INSERT INTO session_message VALUES('v2','selected','user',0,2000,?)", ('{"text":"authoritative V2"}',))
+s.commit();s.close()
+d=m.open_db()
+assert len([r for r in m.rows(d,'') if r['id']=='selected'])==1
+assert [r['text'] for r in m.session_prompts(d,'selected')[1]]==['authoritative V2']
+assert d.execute("SELECT source_format FROM sessions WHERE id='selected'").fetchone()[0]=='opencode-v2'
+assert [r[1] for r in d.execute('PRAGMA table_info(sessions)')].count('source_format')==1
+before=d.total_changes
+m.sync_opencode(d)
+assert d.total_changes==before, 'unchanged formats and update times must skip writes'
+d.close()
+d=m.open_db();d.close()
+`, [source,cache]);
+});
+
+test('unsupported OpenCode storage fails actionably without deleting cached history', {skip: !hasPython && 'python3 not found'}, t => {
+  const source = fixture(t, 2);
+  python(`import importlib.util,sqlite3,sys,pathlib
+spec=importlib.util.spec_from_file_location('sessions','lib/sessions/sessions.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.OPENCODE=pathlib.Path(sys.argv[1])
+d=sqlite3.connect(':memory:');d.executescript(m.SCHEMA)
+d.execute("INSERT INTO sessions(id,tool) VALUES('selected','opencode')")
+d.execute("INSERT INTO prompts VALUES('selected',1,'cached history')");d.commit()
+s=sqlite3.connect(m.OPENCODE);s.execute('DROP TABLE session_message');s.commit();s.close()
+try:
+ m.sync_opencode(d)
+except ValueError as e:
+ assert 'unsupported OpenCode schema' in str(e) and 'supported native database' in str(e), str(e)
+else:
+ raise AssertionError('unsupported storage accepted')
+assert d.execute('SELECT text FROM prompts').fetchall()==[('cached history',)]
+`, [source]);
+});
+
+
+test('V1 index retains visible text around slash-command, synthetic and ignored parts', {skip: !hasPython && 'python3 not found'}, t => {
+  const source = fixture(t, 1, [{data:{role:'user'}, parts:[
+    {type:'text',text:'/clear'}, {type:'text',text:' first request '},
+    {type:'text',text:'hidden synthetic',synthetic:true}, {type:'text',text:'hidden ignored',ignored:true},
+    {type:'text',text:'/compact'}, {type:'text',text:' second request '}
+  ]}, {data:{role:'user'}, parts:[{type:'text',text:' trailing command '}, {type:'text',text:'/clear'}]}]);
+  python(`import importlib.util,sqlite3,sys,pathlib
+spec=importlib.util.spec_from_file_location('sessions','lib/sessions/sessions.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.OPENCODE=pathlib.Path(sys.argv[1])
+d=sqlite3.connect(':memory:');d.executescript(m.SCHEMA)
+m.sync_opencode(d)
+assert d.execute('SELECT text FROM prompts ORDER BY ts').fetchall()==[('first request\\nsecond request',),('trailing command',)]
+`, [source]);
 });

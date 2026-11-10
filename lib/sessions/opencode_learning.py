@@ -139,7 +139,18 @@ def native_prompts(connection, desc):
         else:
             if data.get('role') != 'user':
                 continue
-            text = '\n'.join(p['data'].get('text', '') for p in parts if p['message_id'] == message['id'] and p['data'].get('type') == 'text' and not p['data'].get('synthetic') and not p['data'].get('ignored'))
+            visible = []
+            for part in parts:
+                data = part['data']
+                if part['message_id'] != message['id'] or data.get('type') != 'text' or data.get('synthetic') or data.get('ignored'):
+                    continue
+                text = data.get('text', '')
+                if not isinstance(text, str):
+                    raise ValueError('unsupported native prompt text')
+                text = text.strip()
+                if text and not text.startswith('/'):
+                    visible.append(text)
+            text = '\n'.join(visible)
         if not isinstance(text, str):
             raise ValueError('unsupported native prompt text')
         if text.strip() and not text.strip().startswith('/'):
