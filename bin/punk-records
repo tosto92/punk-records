@@ -178,7 +178,8 @@ usage: punk-records <command> [flags]
   synth prepare|apply|status|remove|run [--global|--local]
                      manual synthesis; status --request-id ID checks publication (see docs/synthesis.md)
   migrate [--apply]  upgrade old event logs
-  learn run --session PATH --agent codex|claude [--timeout N] [--after-line N] -- COMMAND ARGS
+  learn run --session PATH|NATIVE_ID --agent codex|claude|opencode [--timeout N] -- COMMAND ARGS
+                     JSONL: [--after-line N]; OpenCode: [--database PATH] [--reextract]
                      extract private learning proposals; learn review RUN_ID inspects them
   sessions [timeline|projects|show <id>|serve] [filter] [-n N] [-d D]
                      past Claude Code / Codex sessions and how to resume them (needs python3)

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import * as learning from '../lib/learning.js';
+import {fixture as nativeFixture, user, assistant, idle, completed, mutate} from './fixtures/learning/opencode.js';
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'punk-learn-'));
@@ -129,4 +130,132 @@ test('exact duplicate detection preserves case-sensitive technical facts', async
   assert.equal(report.status,'review_required');
   assert.equal(report.proposals[0].status,'proposal');
   assert.equal(report.proposals[0].relatedMemories.length,1);
+});
+
+
+// Synthetic native data only; worker reads stdin and never invokes a provider.
+
+function native(t, messages) {
+  return {...fixture(t), agent:'opencode', source:'selected', database:nativeFixture(t,2,messages)};
+}
+const checkpoint = f => path.join(f.store,'learning',fs.readdirSync(path.join(f.store,'learning')).find(n=>/^[a-f0-9]{64}\.json$/.test(n)));
+const read = file => JSON.parse(fs.readFileSync(file));
+
+test('OpenCode private capture, exact evidence metadata, duplicates and synchronous review', async t => {
+  const f=native(t,[user('test'),assistant([{type:'tool',id:'failed',name:'shell',state:{status:'error',error:'',metadata:{exit:1}}}]),idle('failed')]);
+  f.related=()=>[{memoryId:'existing',title:'Gateway repair',memory:{solution:'Repair was verified'}}];
+  const r=await learning.runLearningJob(f);assert.equal(r.status,'review_required',r.errors.join());
+  assert.equal(r.published,false);assert.equal(r.sourceComplete,true);assert.equal(r.proposals[0].status,'duplicate');
+  const q=read(r.paths.request), e=r.proposals[0].evidence[0];
+  assert.equal(q.sourceDescriptor.sessionId,'selected');assert.equal(q.scope,'global');
+  assert.equal(e.locator.toolCallId,'failed');assert.equal(e.locator.kind,'tool-metadata');
+  assert.equal(e.textSource,'native-metadata');assert.equal(e.toolStatus,'error');assert.equal(e.exitCode,1);
+  assert.equal(fs.statSync(r.paths.projection).mode & 0o777,0o600);
+  assert.equal(fs.existsSync(path.join(f.store,'events.jsonl')),false);
+  assert.equal(learning.reviewLearningRun(f.store,r.runId).sourceChanged,false);
+  mutate(f.database,'UPDATE session_v2 SET time_updated=9000 WHERE id=?',['other']);
+  assert.equal(learning.reviewLearningRun(f.store,r.runId).sourceChanged,false);
+});
+
+test('OpenCode noop retains deferred coverage, correction freshness and appended context', async t => {
+  const f=native(t,[...completed(),user('unfinished correction')]);
+  const a=await learning.runLearningJob(f);assert.equal(a.status,'review_required',a.errors.join());
+  assert.equal(a.caughtUp,true);assert.equal(a.sourceComplete,false);
+  const b=await learning.runLearningJob({...f,command:['/never-run']});assert.equal(b.status,'noop');
+  assert.equal(b.sourceComplete,false);assert.equal(b.caughtUp,true);assert.deepEqual(b.coverage,a.coverage);
+  mutate(f.database,'UPDATE session_message SET data=? WHERE id=?',[JSON.stringify(user('changed correction').data),'3']);
+  assert.equal(learning.reviewLearningRun(f.store,a.runId).sourceChanged,true);
+  for (const [i,m] of [assistant(),idle()].entries()) mutate(f.database,'INSERT INTO session_message VALUES(?,?,?,?,?,?,?)',[String(4+i),'selected',m.type,4+i,1004+i,1004+i,JSON.stringify(m.data)]);
+  const c=await learning.runLearningJob(f);assert.equal(c.status,'review_required',c.errors.join());
+  const q=read(c.paths.request);assert.equal(q.records.filter(r=>r.context).length,2);assert.equal(q.records.filter(r=>!r.context).length,2);
+  assert.equal(c.sourceComplete,true);
+});
+
+test('OpenCode consumed edit/delete/reorder requires explicit recoverable generation', async t => {
+  for (const sql of ["UPDATE session_message SET data='{}' WHERE id='1'", "DELETE FROM session_message WHERE id='1'", "UPDATE session_message SET seq=-1 WHERE id='1'"]) {
+    const f=native(t);const a=await learning.runLearningJob(f);assert.equal(a.status,'review_required');
+    const state=checkpoint(f), old=fs.readFileSync(state);
+    mutate(f.database,sql);assert.equal((await learning.runLearningJob(f)).status,'error');assert.deepEqual(fs.readFileSync(state),old);
+    // Restore a valid but rewritten completed history.
+    mutate(f.database,'DELETE FROM session_message');
+    for (const [i,m] of [user('rewritten'),assistant(),idle()].entries()) mutate(f.database,'INSERT INTO session_message VALUES(?,?,?,?,?,?,?)',[String(i),'selected',m.type,i,1000+i,1000+i,JSON.stringify(m.data)]);
+    const b=await learning.runLearningJob({...f,reextract:true});assert.equal(b.status,'review_required',b.errors.join());
+    assert.equal(read(b.paths.request).previousProposals.length,0);assert.equal(b.proposals[0].previousProposal,false);
+    assert.match(read(state).generation,/^[a-f0-9-]{36}$/);assert.notEqual(read(state).generation,JSON.parse(old).generation);assert.ok(fs.existsSync(a.paths.request));
+    const archive=path.join(f.store,'learning','generations',path.basename(state,'.json'),`${JSON.parse(old).generation}.json`);assert.deepEqual(read(archive),JSON.parse(old));
+    assert.equal((await learning.runLearningJob(f)).status,'noop');
+  }
+});
+
+test('OpenCode recovery archive and replacement failures preserve active state and retry identical archive', async t => {
+  const f=native(t);assert.equal((await learning.runLearningJob(f)).status,'review_required');
+  const state=checkpoint(f), old=fs.readFileSync(state), originalWrite=fs.writeFileSync, originalRename=fs.renameSync;
+  let mock=t.mock.method(fs,'writeFileSync',(file,...args)=>{if(String(file).includes('/generations/')) throw new Error('archive failure');return originalWrite(file,...args);});
+  assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'error');assert.deepEqual(fs.readFileSync(state),old);mock.mock.restore();
+  mock=t.mock.method(fs,'renameSync',(from,to)=>{if(to===state) throw new Error('replacement failure');return originalRename(from,to);});
+  assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'error');assert.deepEqual(fs.readFileSync(state),old);mock.mock.restore();
+  assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'review_required');assert.match(read(state).generation,/^[a-f0-9-]{36}$/);assert.notEqual(read(state).generation,JSON.parse(old).generation);
+});
+
+test('OpenCode same-source/scope exclusive lock covers recovery', async t => {
+  const f=native(t), first=learning.runLearningJob(f);
+  assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'error');assert.equal((await first).status,'review_required');
+});
+
+test('CLI accepts native IDs/database/reextract and validates option boundaries before writes', t => {
+  const f=native(t), cli=new URL('../bin/punk-records',import.meta.url);
+  const run=args=>spawnSync(process.execPath,[cli.pathname,'learn',...args],{cwd:f.root,env:{...process.env,PUNK_RECORDS_HOME:f.store},encoding:'utf8'});
+  for (const args of [ ['--agent','codex','--database',f.database], ['--agent','claude','--reextract'], ['--agent','opencode','--after-line','0'], ['--agent','opencode','--database'], ['--agent','opencode','--reextract','--reextract'], ['--agent','opencode','--unknown','x'], ['--agent','opencode','--database','--timeout','3'] ]) {
+    assert.equal(run(['run','--session','selected',...args,'--',...f.command]).status,2);assert.equal(fs.existsSync(path.join(f.store,'learning')),false);
+  }
+  fs.appendFileSync(f.command[1],`\nif(JSON.stringify(process.argv.slice(2))!==JSON.stringify(['--literal-worker-flag']))process.exit(7);`);
+  const r=run(['run','--session','selected','--agent','opencode','--database',f.database,'--reextract','--',...f.command,'--literal-worker-flag']);
+  assert.equal(r.status,0,r.stderr+r.stdout);const report=JSON.parse(r.stdout);assert.equal(report.status,'review_required');
+  assert.equal(JSON.parse(run(['review',report.runId]).stdout).sourceChanged,false);
+});
+
+
+test('OpenCode archive conflicts fail without replacement; native read failure never advances', async t => {
+  const f=native(t);const first=await learning.runLearningJob(f);assert.equal(first.status,'review_required');
+  const state=checkpoint(f),old=fs.readFileSync(state), generation=JSON.parse(old).generation;
+  const dir=path.join(f.store,'learning','generations',path.basename(state,'.json'));fs.mkdirSync(dir,{recursive:true});
+  const archive=path.join(dir,`${generation}.json`);fs.writeFileSync(archive,'{}\n');
+  assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'error');assert.deepEqual(fs.readFileSync(state),old);assert.equal(fs.readFileSync(archive,'utf8'),'{}\n');
+  fs.unlinkSync(archive);const outside=path.join(f.root,'outside.json');fs.writeFileSync(outside,'{}');fs.symlinkSync(outside,archive);
+  assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'error');assert.deepEqual(fs.readFileSync(state),old);assert.equal(fs.readFileSync(outside,'utf8'),'{}');
+  fs.unlinkSync(f.database);assert.equal((await learning.runLearningJob(f)).status,'error');assert.deepEqual(fs.readFileSync(state),old);
+  assert.equal(learning.reviewLearningRun(f.store,first.runId).sourceChanged,true);
+});
+
+test('OpenCode canonical windows retain 80/20 limits and 4000 visible characters', () => {
+  const row={role:'assistant',text:'x'.repeat(5000),locator:{sessionId:'selected',messageId:'native',ordinal:0,kind:'text'}};
+  const bytes=Buffer.from((JSON.stringify(row)+'\n').repeat(82));
+  const a=learning.readLearningWindow(bytes,'opencode');assert.ok(a.records.length<=80 && a.records.length>0);assert.equal(a.records[0].text.length,4000);assert.equal(a.records[0].truncated,true);
+  const b=learning.readLearningWindow(bytes,'opencode',a.endLine);assert.equal(b.records.filter(r=>r.context).length,20);assert.equal(b.caughtUp,true);
+});
+
+
+test('native unavailable and clipped output flags survive evidence validation', () => {
+  const row={role:'tool',text:'visible output',locator:{sessionId:'s',messageId:'m',kind:'shell'},toolName:'shell',toolStatus:'exited',exitCode:1,unavailable:true,outputMetadata:{cursor:7,size:99,truncated:true}};
+  const request=learning.readLearningWindow(Buffer.from(JSON.stringify(row)+'\n'),'opencode');
+  const p={type:'note',title:'Shell',symptoms:'failure',solution:'observed',uncertainty:'',evidence:[{line:1,quote:'visible output'}]};
+  const evidence=learning.validateLearningResponse({version:1,proposals:[p]},request)[0].evidence[0];
+  assert.equal(evidence.unavailable,true);assert.deepEqual(evidence.outputMetadata,row.outputMetadata);assert.equal(evidence.toolName,'shell');
+});
+
+
+test('JSONL after-line remains explicit and cannot reset an existing checkpoint', async t => {
+  const f=fixture(t);fs.appendFileSync(f.source,fs.readFileSync(f.source));
+  const a=await learning.runLearningJob({...f,afterLine:1});assert.equal(a.status,'review_required');
+  const q=read(a.paths.request);assert.deepEqual(q.records.map(r=>r.context),[true,false]);
+  const state=checkpoint(f),old=fs.readFileSync(state);
+  assert.equal((await learning.runLearningJob({...f,afterLine:0})).status,'error');assert.deepEqual(fs.readFileSync(state),old);
+});
+
+test('OpenCode V1 runner preserves native part evidence and operator scope', async t => {
+  const database=nativeFixture(t,1,[{data:{role:'user'},parts:[{type:'text',text:'prompt'}]},{data:{role:'assistant',finish:'stop',time:{completed:1002}},parts:[{type:'text',text:'verified repair'}]}]);
+  const f={...fixture(t),source:'selected',agent:'opencode',database};
+  const a=await learning.runLearningJob(f);assert.equal(a.status,'review_required',a.errors.join());
+  const q=read(a.paths.request);assert.equal(q.scope,'global');assert.equal(q.sourceDescriptor.storageFormat,'opencode-v1');
+  assert.equal(a.proposals[0].evidence[0].locator.partId,'1-0');assert.equal(a.proposals[0].evidence[0].finish,'stop');
 });
