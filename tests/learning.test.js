@@ -190,7 +190,7 @@ test('OpenCode consumed edit/delete/reorder requires explicit recoverable genera
 test('OpenCode recovery archive and replacement failures preserve active state and retry identical archive', async t => {
   const f=native(t);assert.equal((await learning.runLearningJob(f)).status,'review_required');
   const state=checkpoint(f), old=fs.readFileSync(state), originalWrite=fs.writeFileSync, originalRename=fs.renameSync;
-  let mock=t.mock.method(fs,'writeFileSync',(file,...args)=>{if(String(file).includes('/generations/')) throw new Error('archive failure');return originalWrite(file,...args);});
+  let mock=t.mock.method(fs,'writeFileSync',(file,...args)=>{if(String(file).includes('/generations/')) {originalWrite(file,String(args[0]).slice(0,24),args[1]);throw new Error('ENOSPC after partial archive write');}return originalWrite(file,...args);});
   assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'error');assert.deepEqual(fs.readFileSync(state),old);mock.mock.restore();
   mock=t.mock.method(fs,'renameSync',(from,to)=>{if(to===state) throw new Error('replacement failure');return originalRename(from,to);});
   assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'error');assert.deepEqual(fs.readFileSync(state),old);mock.mock.restore();
@@ -285,4 +285,47 @@ test('OpenCode oversized checkpoint lineage fails before replacing or archiving 
   mutate(f.database,"UPDATE session_v2 SET parent_id=NULL WHERE id='selected'");
   assert.equal((await learning.runLearningJob(f)).status,'noop');
   assert.equal((await learning.runLearningJob({...f,reextract:true})).status,'noop');
+});
+
+
+test('OpenCode rewritten valid prefix shows scoped recovery; corrupt checkpoints do not', async t => {
+  const f=native(t);assert.equal((await learning.runLearningJob(f)).status,'review_required');
+  const state=checkpoint(f), old=read(state);
+  mutate(f.database,'UPDATE session_message SET data=? WHERE id=?',[JSON.stringify(user('rewritten').data),'0']);
+  const rewritten=await learning.runLearningJob(f);
+  assert.match(rewritten.errors.join(),/--reextract.*reprocess.*new generation/);
+  fs.writeFileSync(state,JSON.stringify({...old,seen:'corrupt'}));
+  const corrupt=await learning.runLearningJob(f);
+  assert.doesNotMatch(corrupt.errors.join(),/--reextract/);
+  assert.equal(corrupt.status,'error');
+});
+
+test('public runner and CLI retain safe acquisition failures before artifacts', async t => {
+  const f=native(t), cli=new URL('../bin/punk-records',import.meta.url);
+  for (const [options, expected] of [[{database:f.database+'.missing'},/database.*not found/],[{source:'absent'},/session.*not found/]]) {
+    const r=await learning.runLearningJob({...f,...options});
+    assert.equal(r.status,'error');assert.match(r.errors.join(),expected);assert.deepEqual(r.paths,{});
+    const child=spawnSync(process.execPath,[cli.pathname,'learn','run','--agent','opencode','--session',options.source??f.source,'--database',options.database??f.database,'--',...f.command],{cwd:f.root,env:{...process.env,PUNK_RECORDS_HOME:f.store},encoding:'utf8'});
+    assert.equal(child.status,2);assert.match(child.stdout+child.stderr,expected);
+    assert.equal(fs.existsSync(f.store),false);
+  }
+  const python=path.join(f.root,'fake-python');fs.writeFileSync(python,'#!/bin/sh\necho "OpenCode capture: SECRET_FILESYSTEM_PAYLOAD" >&2\nexit 2\n',{mode:0o700});
+  const previous=process.env.PUNK_RECORDS_PYTHON;
+  try {
+    process.env.PUNK_RECORDS_PYTHON=python;
+    const r=await learning.runLearningJob(f);assert.equal(r.status,'error');assert.doesNotMatch(r.errors.join(),/SECRET/);assert.deepEqual(r.paths,{});
+  } finally {if(previous===undefined) delete process.env.PUNK_RECORDS_PYTHON;else process.env.PUNK_RECORDS_PYTHON=previous;}
+});
+
+test('compacted tool native exit survives capture, window and validated evidence', async t => {
+  for (const version of [1,2]) {
+    const tool={type:'tool',id:'compacted',tool:'shell',name:'shell',state:{status:'completed',output:'PRIVATE_UNAVAILABLE',content:[{type:'text',text:'PRIVATE_UNAVAILABLE'}],metadata:{exit:1},time:{compacted:1001}}};
+    const messages=version===2 ? [user('run'),assistant([tool]),idle()] : [{data:{role:'user'},parts:[{type:'text',text:'run'}]},{data:{role:'assistant',finish:'stop',time:{completed:1002}},parts:[tool]}];
+    const f={...fixture(t),agent:'opencode',source:'selected',database:nativeFixture(t,version,messages)};
+    const r=await learning.runLearningJob(f);assert.equal(r.status,'review_required',r.errors.join());
+    const record=read(r.paths.request).records.find(r=>r.role==='tool');
+    assert.equal(record.exitCode,1);assert.equal(record.unavailable,true);assert.equal(record.toolStatus,'completed');
+    assert.equal(r.proposals[0].evidence[0].exitCode,1);assert.equal(r.proposals[0].evidence[0].unavailable,true);
+    assert.doesNotMatch(fs.readFileSync(r.paths.projection,'utf8'),/PRIVATE_UNAVAILABLE/);
+  }
 });

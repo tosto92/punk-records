@@ -88,24 +88,32 @@ def session_bytes(connection, table, session_id):
     return size
 
 
-def selected_rows(connection, desc):
+def selected_rows(connection, desc, prompts_only=False):
     version = 2 if desc['storageFormat'] == 'opencode-v2' else 1
     schema(connection, version)
     mt, pt = ('session_message', 'session_part') if version == 2 else ('message', 'part')
     sid = desc['sessionId']
-    # Count bytes before fetching JSON: unrelated sessions never consume this budget.
+    message_where, part_where = 'session_id=?', 'session_id=?'
+    message_params = part_params = (sid,)
+    if prompts_only:
+        # Filter in SQLite before hydration: assistant blobs cannot block prompt discovery.
+        message_where += " AND " + ("type='user'" if version == 2 else "CASE WHEN json_valid(data) THEN json_extract(data,'$.role')='user' ELSE 1 END")
+        part_where += ' AND message_id IN (SELECT id FROM ' + mt + ' WHERE ' + message_where + ')'
+        part_params = (sid, sid)
+        part_where += " AND " + ("0" if version == 2 else "CASE WHEN json_valid(data) THEN json_extract(data,'$.type')='text' ELSE 1 END")
+    # Count selected bytes before fetching JSON; capture still includes every native row.
     count = 0
-    size = session_bytes(connection, 'session_v2' if version == 2 else 'session', sid)
-    for table in [mt, pt]:
-        n, b = connection.execute('SELECT COUNT(*), COALESCE(SUM(length(CAST(data AS BLOB))),0) FROM ' + table + ' WHERE session_id=?', (sid,)).fetchone()
+    size = 0 if prompts_only else session_bytes(connection, 'session_v2' if version == 2 else 'session', sid)
+    for table, where, params in [(mt, message_where, message_params), (pt, part_where, part_params)]:
+        n, b = connection.execute('SELECT COUNT(*), COALESCE(SUM(length(CAST(data AS BLOB))),0) FROM ' + table + ' WHERE ' + where, params).fetchone()
         count += n
         size += b
     if count > MAX_ROWS:
         raise ValueError('native row limit exceeded for selected session')
     if size > MAX_JSON:
         raise ValueError('selected native JSON limit exceeded (32 MiB)')
-    messages = list(rows(connection, 'SELECT * FROM ' + mt + ' WHERE session_id=? ORDER BY ' + ('seq' if version == 2 else 'time_created,id'), (sid,)))
-    parts = list(rows(connection, 'SELECT * FROM ' + pt + ' WHERE session_id=? ORDER BY ' + ('message_id,ordinal' if version == 2 else 'id'), (sid,)))
+    messages = list(rows(connection, 'SELECT * FROM ' + mt + ' WHERE ' + message_where + ' ORDER BY ' + ('seq' if version == 2 else 'time_created,id'), message_params))
+    parts = list(rows(connection, 'SELECT * FROM ' + pt + ' WHERE ' + part_where + ' ORDER BY ' + ('message_id,ordinal' if version == 2 else 'id'), part_params))
     ids = {m['id'] for m in messages}
     if len(ids) != len(messages) or (version == 2 and len({m['seq'] for m in messages}) != len(messages)):
         raise ValueError('ambiguous native message order')
@@ -129,7 +137,7 @@ def selected_rows(connection, desc):
 
 
 def native_prompts(connection, desc):
-    messages, parts = selected_rows(connection, desc)
+    messages, parts = selected_rows(connection, desc, prompts_only=True)
     by_message = {}
     if desc['storageFormat'] == 'opencode-v1':
         for part in parts:
@@ -269,9 +277,15 @@ def project(desc, messages, parts, revision):
                 return
             if status not in {'completed', 'error'}:
                 raise ValueError('unsupported native tool status')
+            metadata = {'toolName': item.get('tool', item.get('name')), 'toolStatus': status}
+            exit_code = (state.get('metadata') or {}).get('exit')
+            if exit_code is not None:
+                if type(exit_code) is not int:
+                    raise ValueError('unsupported native tool exit code')
+                metadata['exitCode'] = exit_code
             if (state.get('time') or {}).get('compacted') or state.get('compacted'):
                 exclude('compacted-tool')
-                emit(message, 'tool', '[compacted tool output unavailable]', locator, toolName=item.get('tool', item.get('name')), toolStatus=status, unavailable=True)
+                emit(message, 'tool', '[compacted tool output unavailable]', locator, unavailable=True, **metadata)
                 return
             text = state.get('output', '')
             if version == 'opencode-v2':
@@ -292,12 +306,6 @@ def project(desc, messages, parts, revision):
             error = state.get('error')
             if error:
                 text = (text + '\n' if text else '') + (error if isinstance(error, str) else canonical(error))
-            metadata = {'toolName': item.get('tool', item.get('name')), 'toolStatus': status}
-            exit_code = (state.get('metadata') or {}).get('exit')
-            if exit_code is not None:
-                if type(exit_code) is not int:
-                    raise ValueError('unsupported native tool exit code')
-                metadata['exitCode'] = exit_code
             emit(message, 'tool', text, locator, **metadata)
         else:
             raise ValueError('unsupported native content type')

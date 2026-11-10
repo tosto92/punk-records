@@ -275,3 +275,9 @@ test('projected metadata tail holds suffix after a completed prefix', async t =>
   assert.deepEqual(records(c).map(r=>r.text),['fix café','verified ✓']);
   assert.doesNotMatch(c.bytes.toString(),/PRIVATE/);
 });
+
+
+test('compacted tool validates native exit type before dropping unavailable output', async t => {
+  const tool={type:'tool',id:'invalid',name:'shell',state:{status:'completed',compacted:true,metadata:{exit:'1'}}};
+  await assert.rejects(capture(fixture(t,2,[user('run'),assistant([tool]),idle()])),/exit code/);
+});

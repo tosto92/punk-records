@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
-import {fixture, python, mutate, user, assistant} from './fixtures/learning/opencode.js';
+import {fixture, python, mutate, user, assistant, idle} from './fixtures/learning/opencode.js';
 
 const CLI = path.resolve(import.meta.dirname, '../bin/punk-records');
 const hasPython = spawnSync('python3', ['--version']).status === 0;
@@ -287,7 +287,7 @@ parts=CountedParts()
 for message in messages:
  for data in [{'type':'text','text':' first '+message['id']+' '}, {'type':'text','text':'/clear'}, {'type':'text','text':'hidden','synthetic':True}, {'type':'text','text':'hidden','ignored':True}, {'type':'text','text':' last '}]:
   parts.append({'message_id':message['id'],'data':data})
-m._reader.selected_rows=lambda connection,desc:(messages,parts)
+m._reader.selected_rows=lambda connection,desc,**options:(messages,parts)
 prompts=list(m._reader.native_prompts(None,{'storageFormat':'opencode-v1'}))
 assert prompts==[{'ts':(1000+i)/1000,'text':'first '+str(i)+'\\nlast'} for i in range(40)]
 assert parts.visits==len(parts), f'parts visited {parts.visits} times for {len(parts)} rows'
@@ -299,4 +299,35 @@ except ValueError as error:
 else:
  raise AssertionError('invalid visible text accepted')
 `);
+});
+
+
+test('large excluded assistant payload does not block prompt discovery or unrelated cached agents', {skip: !hasPython && 'python3 not found'}, t => {
+  for (const version of [1,2]) {
+    const source=fixture(t,version,version===1 ? [{data:{role:'user'},parts:[{type:'text',text:'small visible prompt'}]},{data:{role:'assistant'},parts:[]}] : [user('small visible prompt'),assistant(),idle()]);
+    python(`import importlib.util,sqlite3,sys,pathlib,json
+spec=importlib.util.spec_from_file_location('sessions','lib/sessions/sessions.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.OPENCODE=pathlib.Path(sys.argv[1]);v=int(sys.argv[2]);s=sqlite3.connect(m.OPENCODE)
+large=json.dumps({'type':'reasoning','text':'x'*(33<<20)})
+if v==1:
+ s.execute('INSERT INTO part VALUES(?,?,?,?)',('large','1','selected',large))
+else:
+ s.execute('UPDATE session_message SET data=? WHERE id=?',(json.dumps({'content':[json.loads(large)]}),'1'))
+s.commit();s.close()
+d=sqlite3.connect(':memory:');d.row_factory=sqlite3.Row;d.executescript(m.SCHEMA)
+for agent in ['claude','codex']:
+ d.execute('INSERT INTO sessions(id,tool) VALUES(?,?)',(agent,agent));d.execute('INSERT INTO prompts VALUES(?,?,?)',(agent,1,'cached '+agent))
+m.sync_opencode(d)
+assert [r['text'] for r in m.session_prompts(d,'selected')[1]]==['small visible prompt']
+for agent in ['claude','codex']:
+ assert m.session_prompts(d,agent)[1][0]['text']=='cached '+agent
+try:
+ m._reader.capture_session(str(m.OPENCODE),'selected')
+except ValueError as e:
+ assert '32 MiB' in str(e), str(e)
+else:
+ raise AssertionError('oversized full capture accepted')
+`,[source,String(version)]);
+  }
 });
