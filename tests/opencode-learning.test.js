@@ -11,15 +11,19 @@ const json = value => JSON.stringify(value);
 async function capture(database, sessionId='selected') { return (await load()).captureOpenCodeSession({database,sessionId}); }
 const records = c => c.bytes.toString('utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
 
-test('V2 capture uses embedded content, exact selection, native locators and deterministic bytes', async t => {
-  const database=fixture(t,2,[...completed(),{...user('PRIVATE_OTHER'),session_id:'other'}]);
+test('V2 capture uses embedded content, exact selection, native locators and deterministic bytes across directory aliases', async t => {
+  const original=fixture(t,2,[...completed(),{...user('PRIVATE_OTHER'),session_id:'other'}]);
+  const alias=path.join(path.dirname(original),'database-alias');
+  fs.symlinkSync(path.dirname(original),alias,'dir');
+  const database=path.join(alias,path.basename(original));
   const c=await capture(database);
   assert.equal(c.coverage.sourceComplete,true);
   assert.deepEqual(records(c).map(r=>r.text),['fix café','verified ✓']);
   assert.deepEqual(records(c)[1].locator,{sessionId:'selected',messageId:'1',kind:'text',ordinal:0});
-  assert.equal(c.descriptor.database,database);
+  assert.equal(c.descriptor.database,fs.realpathSync(database));
   assert.equal(c.descriptor.storageFormat,'opencode-v2');
   assert.deepEqual((await capture(database)).bytes,c.bytes);
+  assert.deepEqual(await capture(original),c);
   assert.equal(records(await capture(database,'other')).length,0);
 });
 test('V1 completed turns match visible V2 content and retain native part locators', async t => {
