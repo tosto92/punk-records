@@ -1,0 +1,30 @@
+{
+  "name": "Protect main",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["~DEFAULT_BRANCH"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {"type": "deletion"},
+    {"type": "non_fast_forward"},
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          {"context": "test (ubuntu-latest, 20)", "integration_id": 15368},
+          {"context": "test (ubuntu-latest, 22)", "integration_id": 15368},
+          {"context": "test (ubuntu-latest, 24)", "integration_id": 15368},
+          {"context": "test (macos-latest, 20)", "integration_id": 15368},
+          {"context": "test (macos-latest, 22)", "integration_id": 15368},
+          {"context": "test (macos-latest, 24)", "integration_id": 15368}
+        ]
+      }
+    }
+  ]
+}
