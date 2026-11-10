@@ -256,3 +256,56 @@ test('shell output metadata is retained while revert payloads stay out of descri
   const db=fixture(t);mutate(db,"UPDATE session_v2 SET revert=? WHERE id='selected'",[json({messageID:'0',diff:'PRIVATE_REVERT_PAYLOAD'})]);
   const held=await capture(db);assert.equal(held.coverage.sourceComplete,false);assert.doesNotMatch(json(held),/PRIVATE_REVERT_PAYLOAD/);
 });
+
+test('empty-output failed tools and native shells retain located metadata for text windows', async t => {
+  const cases = [
+    [2, [user('run'),assistant([{type:'tool',id:'empty-call',name:'shell',state:{status:'completed',content:[],metadata:{exit:1}}}]),idle('failed')]],
+    [2, [user('run'),{type:'shell',data:{status:'exited',exit:1,time:{completed:1002},output:{output:''}}},idle('failed')]],
+    [1, [{data:{role:'user'},parts:[{type:'text',text:'run'}]}, {data:{role:'assistant',finish:'stop',time:{completed:1002}},parts:[{type:'tool',callID:'empty-call',tool:'shell',state:{status:'completed',output:'',metadata:{exit:1}}}]}]],
+  ];
+  for(const [version,messages] of cases) {
+    const c=await capture(fixture(t,version,messages)), tool=records(c).find(r=>r.role==='tool');
+    assert.equal(c.coverage.sourceComplete,true);
+    assert.ok(tool,'native failed command survives empty output');
+    assert.equal(tool.exitCode,1);assert.match(tool.toolStatus,/completed|exited/);
+    assert.equal(tool.textSource,'native-metadata');assert.match(tool.locator.kind,/-metadata$/);
+    assert.match(tool.text,/native tool metadata/);assert.match(tool.text,/exit=1/);
+    assert.ok(tool.text.trim(),'text-only evidence windows can retain this record');
+    assert.doesNotMatch(tool.text,/success|stdout|verified/i);
+    assert.equal(tool.locator.sessionId,'selected');assert.equal(tool.locator.messageId,'1');
+    if(tool.toolStatus==='completed') assert.equal(tool.locator.toolCallId,'empty-call');
+  }
+});
+test('selected session metadata is budgeted before hydration and shares the native JSON budget', t => {
+  const database=fixture(t);
+  mutate(database,"UPDATE session_v2 SET revert=? WHERE id='selected'",['x'.repeat(4096)]);
+  python(`import importlib.util,sys,sqlite3
+s=importlib.util.spec_from_file_location('capture',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+m.MAX_JSON=512
+original=sqlite3.connect;seen=[]
+def connect(*args,**kwargs):
+ c=original(*args,**kwargs);c.set_trace_callback(seen.append);return c
+m.sqlite3.connect=connect
+try: m.capture_session(sys.argv[2],'selected')
+except ValueError as error: assert 'JSON limit' in str(error),str(error)
+else: raise AssertionError('oversized selected metadata accepted')
+assert not any(sql.startswith('SELECT * FROM session_v2') for sql in seen),seen
+`,[bridge,database]);
+  mutate(database,"UPDATE session_v2 SET revert=NULL,title=? WHERE id='selected'",['x'.repeat(200)]);
+  python(`import importlib.util,sys
+s=importlib.util.spec_from_file_location('capture',sys.argv[1]);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+m.MAX_JSON=400
+try: m.capture_session(sys.argv[2],'selected')
+except ValueError as error: assert 'native JSON limit' in str(error),str(error)
+else: raise AssertionError('combined metadata/message budget accepted')`,[bridge,database]);
+});
+test('projected metadata tail holds suffix after a completed prefix', async t => {
+  const database=fixture(t,2,[...completed(),{type:'system',data:{text:'PRIVATE_METADATA_TAIL'}}]);
+  mutate(database,'INSERT INTO session_part VALUES(?,?,?,?,?,?)',['3','selected',0,'text',null,json({type:'text',text:'PRIVATE_PROJECTION'})]);
+  const c=await capture(database);
+  assert.equal(c.coverage.sourceComplete,false);assert.equal(c.coverage.heldMessages,1);
+  assert.deepEqual(c.coverage.deferredFrom,{sessionId:'selected',messageId:'3'});
+  assert.match(c.coverage.reason,/unreconciled.*projection/);
+  assert.deepEqual(records(c).map(r=>r.text),['fix café','verified ✓']);
+  assert.doesNotMatch(c.bytes.toString(),/PRIVATE/);
+});

@@ -79,13 +79,23 @@ def native_sessions(connection):
         raise ValueError('unsupported OpenCode schema; native session tables missing')
 
 
+def session_bytes(connection, table, session_id):
+    fields = ['"' + field.replace('"', '""') + '"' for field in columns(connection, table)]
+    sizes = '+'.join('COALESCE(length(CAST(' + field + ' AS BLOB)),0)' for field in fields)
+    size = connection.execute('SELECT COALESCE(SUM(' + sizes + '),0) FROM ' + table + ' WHERE id=?', (session_id,)).fetchone()[0]
+    if size > MAX_JSON:
+        raise ValueError('selected native JSON limit exceeded (32 MiB)')
+    return size
+
+
 def selected_rows(connection, desc):
     version = 2 if desc['storageFormat'] == 'opencode-v2' else 1
     schema(connection, version)
     mt, pt = ('session_message', 'session_part') if version == 2 else ('message', 'part')
     sid = desc['sessionId']
     # Count bytes before fetching JSON: unrelated sessions never consume this budget.
-    count = size = 0
+    count = 0
+    size = session_bytes(connection, 'session_v2' if version == 2 else 'session', sid)
     for table in [mt, pt]:
         n, b = connection.execute('SELECT COUNT(*), COALESCE(SUM(length(CAST(data AS BLOB))),0) FROM ' + table + ' WHERE session_id=?', (sid,)).fetchone()
         count += n
@@ -168,6 +178,7 @@ def capture_session(database, session_id):
             found_tables = True
             if 'id' not in available:
                 raise ValueError('unsupported OpenCode session schema')
+            session_bytes(connection, table, session_id)
             native = next(rows(connection, 'SELECT * FROM ' + table + ' WHERE id=?', (session_id,)), None)
             if native is not None:
                 if not {'id', 'directory', 'time_updated'} <= available:
@@ -179,8 +190,6 @@ def capture_session(database, session_id):
         if desc is None:
             raise ValueError('OpenCode session not found; select an exact native session ID')
         messages, parts = selected_rows(connection, desc)
-        table = 'session_v2' if desc['storageFormat'] == 'opencode-v2' else 'session'
-        native = next(rows(connection, 'SELECT * FROM ' + table + ' WHERE id=?', (session_id,)))
         revision = hashlib.sha256(canonical([native, messages, parts]).encode()).hexdigest()
     finally:
         connection.close()
@@ -209,6 +218,13 @@ def project(desc, messages, parts, revision):
         nonlocal emitted_bytes
         if not isinstance(text, str):
             raise ValueError('unsupported native visible text')
+        if role == 'tool' and not text.strip():
+            text = '[native tool metadata: status=' + metadata['toolStatus']
+            if 'exitCode' in metadata:
+                text += '; exit=' + str(metadata['exitCode'])
+            text += ']'
+            metadata['textSource'] = 'native-metadata'
+            locator = {**locator, 'kind': locator['kind'] + '-metadata'}
         if text.strip():
             record = {'role': role, 'text': text, 'timestamp': timestamp(message.get('time_created')),
                       'locator': {'sessionId': desc['sessionId'], 'messageId': message['id'], **locator}, **metadata}
@@ -279,6 +295,8 @@ def project(desc, messages, parts, revision):
                 blocked = 'unreconciled native part projection'
             if kind in METADATA:
                 exclude(kind)
+                if blocked and not held_reason:
+                    held_reason = blocked
                 continue
             if kind == 'location-switched':
                 blocked = 'location-switched history cannot be interpreted safely'
