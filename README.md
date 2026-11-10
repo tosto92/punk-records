@@ -15,6 +15,88 @@ recalls them when they matter in **Claude Code**, **Codex** and **OpenCode**.
 - Core storage and recall stay on your machine: no network access, no telemetry.
 - Plain files: an append-only `events.jsonl` you can read, grep and commit.
 
+## Quick start
+
+### 1. Install
+
+Requires **Node.js 20.11+** and **Git**. Add **Python 3.9+** to browse sessions
+or learn from native OpenCode sessions.
+
+```sh
+git clone https://github.com/tosto92/punk-records.git
+cd punk-records
+```
+
+No `npm install` is needed. Keep this checkout in place: global setup links to it.
+For agent plugins or the npm package, see [installation options](#install).
+
+### 2. Initialize your agents
+
+From the checkout, run the command for each agent you use:
+
+| Agent | Global setup |
+|---|---|
+| Claude Code | `node bin/punk-records init --global --agents claude` |
+| Codex | `node bin/punk-records init --global --agents codex` |
+| OpenCode V1 | `node bin/punk-records init --global --agents opencode --opencode-api v1` |
+| OpenCode V2 | `node bin/punk-records init --global --agents opencode --opencode-api v2` |
+
+You can combine agents, for example `--agents claude,codex`. Select the OpenCode
+row matching your installed API. Add `--dry-run` to preview configuration changes.
+Use either the agent plugin or this setup for each agent, so hooks are installed once.
+
+Setup installs hooks, MCP configuration and skills, and links the CLI into
+`~/.local/bin`. If that directory is missing from your `PATH`, add it to your
+shell profile; for the current terminal:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+### 3. Open your project
+
+Start a **new agent session** after initialization:
+
+```sh
+cd /path/to/your/project
+codex                         # or: claude / opencode
+```
+
+In Codex, use `/hooks` to review and approve the installed hooks when requested.
+Global setup covers your Git projects: you do not need to initialize each repo.
+Use `punk-records init` inside a repo only for project-level configuration, or
+`punk-records init --local` to mark a folder without Git as a project.
+
+### 4. Recall, save and browse
+
+Ask your agent naturally: *"Have we seen this error before?"* or
+*"Save how we fixed this as a project memory."* Relevant saved memories are
+recalled automatically. Activity drafts record edits; reusable fixes and decisions
+must be saved explicitly by you or the agent.
+
+For direct CLI use:
+
+```sh
+punk-records ask "<error or topic>"
+punk-records save --type solved --title "<fix title>" --solution "<what worked>"
+punk-records serve --open                  # memories, sessions and synthesis
+punk-records sessions timeline -d 7        # recent work and resume commands
+```
+
+To learn from several sessions, ask: *"Use punk-records-learn to consolidate the
+last 5 sessions of this project with saved memories."* The skill presents one
+summary for confirmation before saving. See [learning commands and examples](#learn-from-project-sessions).
+
+Project memories live in `memory/` in the primary checkout; add that directory
+to your project's `.gitignore` if they should stay private. Use `save --global`
+for knowledge shared across projects. See [storage and scope](#where-memories-live).
+
+Continue with [how it works](#how-it-works), [usage details](#use),
+[sessions](#sessions), [optional synthesis](#reviewed-synthesis-opt-in),
+[memory protection](#memory-protection-opt-in), or [upgrading an existing installation](#upgrading-an-existing-installation).
+
+## How it works
+
 Optional [incremental synthesis](docs/synthesis.md) combines selected Punk Records memories and native Markdown files into reviewed summaries. An agent you choose generates the drafts; its provider may receive the selected content and charge for model usage. Review and publish in the **Synthesis** tab of `punk-records serve`. Summary recall is opt-in; originals stay available.
 
 [Deferred learning](docs/deferred-learning.md) extracts evidence-linked proposals from explicitly selected Claude/Codex transcripts or native OpenCode V1/V2 SQLite sessions with a worker you choose. `punk-records learn` keeps incremental checkpoints and private review artifacts; proposals stay outside recall until you separately review and save them.
@@ -63,7 +145,8 @@ covers: src/auth/session.ts
 
 ## Install
 
-Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for `sessions`.
+Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for
+`sessions` and native OpenCode learning.
 Optional memory protection requires Python 3.10+ and pinned NOVA in a dedicated
 venv; it makes no model or provider calls.
 
@@ -91,7 +174,9 @@ punk-records init --global      # from a clone: node bin/punk-records init --glo
 `init --global` wires every agent for all your projects: recall and capture
 hooks, the `punk-records` MCP server, the skills and a `/punk-records-save`
 command. It links `~/.local/bin/punk-records`; keep that directory on your `PATH`.
-Limit it with `--agents claude,codex,opencode`; preview with `--dry-run`.
+Limit it with `--agents claude,codex`; preview with `--dry-run`.
+For OpenCode, select `--opencode-api v1` (default) or `--opencode-api v2` to match
+your installed version.
 
 Pick **one** of the two for each agent: the plugin and `init --global` both
 install hooks, and having both makes recall and capture run twice.
