@@ -22,17 +22,38 @@ recalls them when they matter in **Claude Code**, **Codex** and **OpenCode**.
 Requires **Node.js 20.11+** and **Git**. Add **Python 3.9+** to browse sessions
 or learn from native OpenCode sessions.
 
+Choose **one installation method per agent**.
+
+#### Agent plugin — Claude Code or Codex
+
+```sh
+# Claude Code
+claude plugin marketplace add tosto92/punk-records
+claude plugin install punk-records@punk-records
+
+# Codex
+codex plugin marketplace add tosto92/punk-records
+codex plugin add punk-records@punk-records
+```
+
+The plugin installs its hooks and skills. Continue with [opening your project](#3-open-your-project);
+do not also run `init --global` for the same agent.
+
+#### CLI — all agents, including OpenCode
+
 ```sh
 git clone https://github.com/tosto92/punk-records.git
 cd punk-records
 ```
 
 No `npm install` is needed. Keep this checkout in place: global setup links to it.
-For agent plugins or the npm package, see [installation options](#install).
+Alternatively, after publication, use `npm install -g punk-records`. In the
+commands below, replace `node bin/punk-records` with `punk-records` for an npm install.
 
 ### 2. Initialize your agents
 
-From the checkout, run the command for each agent you use:
+**CLI installations only:** from the checkout, run the command for each agent
+you use. Skip agents already installed as plugins.
 
 | Agent | Global setup |
 |---|---|
@@ -43,7 +64,7 @@ From the checkout, run the command for each agent you use:
 
 You can combine agents, for example `--agents claude,codex`. Select the OpenCode
 row matching your installed API. Add `--dry-run` to preview configuration changes.
-Use either the agent plugin or this setup for each agent, so hooks are installed once.
+For example, if Claude Code and Codex use plugins, initialize only OpenCode here.
 
 Setup installs hooks, MCP configuration and skills, and links the CLI into
 `~/.local/bin`. If that directory is missing from your `PATH`, add it to your
@@ -74,7 +95,7 @@ Ask your agent naturally: *"Have we seen this error before?"* or
 recalled automatically. Activity drafts record edits; reusable fixes and decisions
 must be saved explicitly by you or the agent.
 
-For direct CLI use:
+If you used the CLI setup, you can also run these commands directly:
 
 ```sh
 punk-records ask "<error or topic>"
@@ -142,46 +163,6 @@ refresh handler stored the token before the response promise resolved; await it 
 covers: src/auth/session.ts
 </punk-records>
 ```
-
-## Install
-
-Requires Node.js 20.11 or later, git for per-repo memory, and Python 3.9+ for
-`sessions` and native OpenCode learning.
-Optional memory protection requires Python 3.10+ and pinned NOVA in a dedicated
-venv; it makes no model or provider calls.
-
-### As a plugin (Claude Code, Codex)
-
-```sh
-# Claude Code: hooks, MCP server, skills and /punk-records-save
-claude plugin marketplace add tosto92/punk-records
-claude plugin install punk-records@punk-records
-
-# Codex: hooks and skills
-codex plugin marketplace add tosto92/punk-records
-codex plugin add punk-records@punk-records
-```
-
-Codex asks you to approve new hooks once: run `/hooks` in Codex after installing.
-
-### With the CLI (all agents, including OpenCode)
-
-```sh
-npm install -g punk-records     # after publication; or clone this repository
-punk-records init --global      # from a clone: node bin/punk-records init --global
-```
-
-`init --global` wires every agent for all your projects: recall and capture
-hooks, the `punk-records` MCP server, the skills and a `/punk-records-save`
-command. It links `~/.local/bin/punk-records`; keep that directory on your `PATH`.
-Limit it with `--agents claude,codex`; preview with `--dry-run`.
-For OpenCode, select `--opencode-api v1` (default) or `--opencode-api v2` to match
-your installed version.
-
-Pick **one** of the two for each agent: the plugin and `init --global` both
-install hooks, and having both makes recall and capture run twice.
-For example, use the plugins for Claude Code and Codex, then
-`punk-records init --global --agents opencode`.
 
 ## Use
 
@@ -334,6 +315,9 @@ full current sources, and stale summaries are excluded from recall. See the
 cost limits and a [review-first scheduling workflow](docs/synthesis.md#periodic-drafts).
 
 ## Memory protection (opt-in)
+
+Requires Python 3.10+ and pinned NOVA in a dedicated venv. Scanning makes no
+model or provider calls.
 
 Unconfigured installs are unprotected. [Set up pinned NOVA and review detected
 memories](docs/memory-security.md), then explicitly launch each agent with
