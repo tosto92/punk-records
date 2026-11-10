@@ -269,3 +269,34 @@ m.sync_opencode(d)
 assert d.execute('SELECT text FROM prompts ORDER BY ts').fetchall()==[('first request\\nsecond request',),('trailing command',)]
 `, [source]);
 });
+
+
+test('V1 prompt indexing scans parts once while retaining ordered visible user text', {skip: !hasPython && 'python3 not found'}, () => {
+  python(`import importlib.util
+spec=importlib.util.spec_from_file_location('sessions','lib/sessions/sessions.py')
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+class CountedParts(list):
+ visits=0
+ def __iter__(self):
+  for part in super().__iter__():
+   self.visits+=1
+   yield part
+messages=[{'id':str(i),'time_created':1000+i,'data':{'role':'user'}} for i in range(40)]
+messages.append({'id':'assistant','time_created':2000,'data':{'role':'assistant'}})
+parts=CountedParts()
+for message in messages:
+ for data in [{'type':'text','text':' first '+message['id']+' '}, {'type':'text','text':'/clear'}, {'type':'text','text':'hidden','synthetic':True}, {'type':'text','text':'hidden','ignored':True}, {'type':'text','text':' last '}]:
+  parts.append({'message_id':message['id'],'data':data})
+m._reader.selected_rows=lambda connection,desc:(messages,parts)
+prompts=list(m._reader.native_prompts(None,{'storageFormat':'opencode-v1'}))
+assert prompts==[{'ts':(1000+i)/1000,'text':'first '+str(i)+'\\nlast'} for i in range(40)]
+assert parts.visits==len(parts), f'parts visited {parts.visits} times for {len(parts)} rows'
+parts[0]['data']['text']=123
+try:
+ list(m._reader.native_prompts(None,{'storageFormat':'opencode-v1'}))
+except ValueError as error:
+ assert str(error)=='unsupported native prompt text'
+else:
+ raise AssertionError('invalid visible text accepted')
+`);
+});

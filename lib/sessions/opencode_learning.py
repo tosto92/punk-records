@@ -130,6 +130,10 @@ def selected_rows(connection, desc):
 
 def native_prompts(connection, desc):
     messages, parts = selected_rows(connection, desc)
+    by_message = {}
+    if desc['storageFormat'] == 'opencode-v1':
+        for part in parts:
+            by_message.setdefault(part['message_id'], []).append(part)
     for message in messages:
         data = message['data']
         if desc['storageFormat'] == 'opencode-v2':
@@ -140,9 +144,9 @@ def native_prompts(connection, desc):
             if data.get('role') != 'user':
                 continue
             visible = []
-            for part in parts:
+            for part in by_message.get(message['id'], []):
                 data = part['data']
-                if part['message_id'] != message['id'] or data.get('type') != 'text' or data.get('synthetic') or data.get('ignored'):
+                if data.get('type') != 'text' or data.get('synthetic') or data.get('ignored'):
                     continue
                 text = data.get('text', '')
                 if not isinstance(text, str):
