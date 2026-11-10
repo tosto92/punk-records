@@ -6,6 +6,12 @@
 /.worktrees/
 /.nova-tracer/
 /.superpowers/
+# Development plans, reviews and experiment reports stay local.
+/docs/superpowers/
+/docs/opencode-v2-learning-probe.md
+/docs/recall-evidence-results.md
+/docs/recall-statistics.md
+/docs/recall-relevance.md
 /.claude/
 /.codex/
 /.agents/skills/

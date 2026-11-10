@@ -124,7 +124,7 @@ The experimental ranking is enabled for automatic recall. It combines local
 evidence with bundled Italian/English [word-frequency data](docs/recall-frequency.md)
 to reduce matches on common words. Parameters are fixed; they do not automatically
 learn from usage. Contextual ambiguity can still produce irrelevant matches or
-miss useful memories. See [evaluation results and limits](docs/recall-evidence-results.md).
+miss useful memories.
 
 Interrupted `Stop` batches are retained rather than expired. A later `Stop` for
 that session can recover a batch from a stopped process when its recorded checkout
@@ -193,8 +193,6 @@ ID plus database identity. Completed prefixes can be processed while unfinished
 or unsupported tails stay held: `caughtUp` does not imply `sourceComplete`.
 Rewritten consumed native history requires explicit scoped `--reextract` recovery,
 which archives the checkpoint in a new generation and leaves prior runs intact.
-The [V2 acquisition probe](docs/opencode-v2-learning-probe.md) documents the synthetic
-live evidence and its limits; it does not measure learning quality.
 
 ### From the command line
 
